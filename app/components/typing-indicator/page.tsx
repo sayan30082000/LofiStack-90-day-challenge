@@ -110,7 +110,7 @@ export default function Page() {
         },
         {
           title: "Activities",
-          description: "Six activities, each with its own animation and wording, in any of the three looks.",
+          description: "Seven activities, each with its own animation and wording, in any of the three looks.",
           preview: <ActivitiesDemo />,
           code: activitiesCode,
         },
