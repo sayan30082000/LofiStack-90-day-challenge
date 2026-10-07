@@ -40,6 +40,16 @@ export const agentLogs: AgentLog[] = [
       "2 tested components that go beyond the usual versions, plus ready-to-post lofidb submissions, across two Claude Code sessions. The audit also caught that Week 1 was due the same day, that the site still had placeholder links, and that generic components risked failing the originality rule. Saved roughly two days of setup and building.",
     automated: true,
   },
+  {
+    week: 2,
+    task: "Add a unit test suite for the Week 1 and Week 2 components",
+    agent: "Claude Code",
+    workflow:
+      "Asked Claude Code to add Vitest + Testing Library and write unit tests for the password scorer, crack-time estimate, best-fix tip and passphrase generator, the Flip Card's press direction and hold-to-peek, the Tree View's change tracking, and the typing hook's \"changed their mind\" state. Run them, fix real bugs, and explain every failure.",
+    result:
+      "53 tests in 4 files, all passing (npm test). While writing them it caught a real bug: the crack-time estimate rated \"hello world\" at 48 years and \"correct horse battery staple\" at millions of years because it ignored dictionary words. It now rates them 1 second and centuries, and l33t passwords like Tr0ub4dor&3 as instant. It also fixed a dependency conflict (@types/node 20 to 22, matching Netlify's Node 22). Saved about half a day.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -54,7 +64,7 @@ export const agentLogPlans: AgentLogPlan[] = [
   {
     week: 2,
     kind: "Unit tests",
-    task: "Write unit tests for the password strength scorer and the OTP input",
+    task: "Add a unit test suite for the Week 1 and Week 2 components",
     agent: "Claude Code",
     prompt: `In this Next.js project, add Vitest + @testing-library/react and write unit tests for:
 1. the exported scorePassword() in components/ui/password-strength-input.tsx: empty, short, common, mixed and very strong passwords, plus every default rule;

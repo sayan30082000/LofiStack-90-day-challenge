@@ -58,7 +58,8 @@ const allComponents: RegistryEntry[] = [
     name: "Password Strength Input",
     type: "input",
     week: 2,
-    description: "Password field with live strength meter and rules checklist.",
+    description:
+      "A password field that explains itself: how long the password would take to crack in plain words, the single change that would help most, and a one-click memorable passphrase that already passes your rules. Plus a strength meter, rules checklist and confirm field.",
     addedAt: "2026-10-02",
     codePath: "password-strength-input.tsx",
   },
@@ -68,7 +69,8 @@ const allComponents: RegistryEntry[] = [
     name: "Flip Card",
     type: "card",
     week: 2,
-    description: "Two-sided card that flips on click, key or hover.",
+    description:
+      "A flip card that behaves like a real card: it turns away from wherever you press, leans toward your cursor to show which way it will go, and lets you press and hold to peek at the back. Keyboard, hover and reduced-motion friendly.",
     addedAt: "2026-10-02",
     codePath: "flip-card.tsx",
   },

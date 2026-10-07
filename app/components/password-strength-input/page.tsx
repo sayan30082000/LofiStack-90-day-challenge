@@ -70,7 +70,13 @@ export function Example() {
 
 // The scorer is pure and exported, so the server can use the same rules:
 scorePassword("correct horse battery staple").score; // 4 (Strong)
-scorePassword("Password123!").score;                  // 1 (Weak, common password)`;
+scorePassword("Password123!").score;                  // 1 (Weak, common password)
+
+// So are the crack-time estimate, the best tip and the passphrase generator:
+estimateCrackTime("hello world").display;    // "1 second": two dictionary words
+estimateCrackTime("Tr0ub4dor&3").display;    // "instantly": l33t spelling doesn't fool attackers
+bestPasswordTip("hello world");              // { id: "length", after: "centuries" }
+generatePassphrase({ count: 5 });             // { value: "Whisk#turtle7elbow9logic3cherry", bits: 66.5 }`;
 
 export default function Page() {
   return (
@@ -80,10 +86,10 @@ export default function Page() {
         {
           title: "Sign-up form",
           description:
-            "Confirm field with match / no match, a minimum-strength notch on the meter, and a submit button that waits for a valid, matching password. Turn Caps Lock on to see the warning.",
+            "Type a password to see how long it would take to crack and the single change that helps most, or tap Suggest a passphrase for a memorable one that already passes the rules and fills both fields. Also: confirm field, minimum-strength notch, Caps Lock warning.",
           preview: <SignUpDemo />,
           code: signUpCode,
-          minHeight: 560,
+          minHeight: 640,
         },
         {
           title: "Custom rules",
@@ -95,7 +101,7 @@ export default function Page() {
         },
         {
           title: "Compact",
-          description: "No checklist: just the field, the toggle and the meter. Also shown disabled.",
+          description: "No checklist, tips or suggestions: just the field, the toggle, the meter and the crack time. Also shown disabled.",
           preview: <CompactDemo />,
           code: compactCode,
         },
@@ -130,7 +136,17 @@ export default function Page() {
         { name: "confirmLabel / matchText / mismatchText", type: "string", default: '"Confirm password" / "Passwords match" / "Passwords don\'t match"', description: "Confirm field wording." },
         { name: "checklistLabel", type: "string", default: '"Your password needs"', description: "Heading of the checklist, also its accessible name." },
         { name: "ruleMetText / ruleUnmetText", type: "string", default: '"done" / "missing"', description: "Screen reader suffix for each checklist item." },
-        { name: "announceDelay", type: "number", default: "800", description: "Milliseconds of quiet typing before the strength is announced." },
+        { name: "announceDelay", type: "number", default: "800", description: "Milliseconds of quiet typing before the strength and crack time are announced." },
+        { name: "showCrackTime", type: "boolean", default: "true", description: "Shows how long the password would take to crack, in plain words (\"About 3 hours to crack\")." },
+        { name: "guessesPerSecond", type: "number", default: "1e10", description: "Attacker speed for the estimate. The default is a fast offline attack on a leaked hash." },
+        { name: "crackTimeText", type: "(time: string) => string", default: "\"About 3 hours to crack\" / \"Would take centuries to crack\"", description: "Crack time sentence." },
+        { name: "showTips", type: "boolean", default: "true", description: "Shows the single change that helps most: avoid a leaked password, break up abc/123/aaa runs, or add length / a case / a number / a symbol, with the new crack time." },
+        { name: "tipText", type: "Partial<Record<PasswordTipId, (after?: string) => string>>", default: "DEFAULT_TIP_TEXT", description: "Wording per tip: common, pattern, length, upper, number, symbol." },
+        { name: "suggestPassphrase", type: "boolean", default: "true", description: "Offers a random, memorable passphrase (crypto.getRandomValues) that already passes the rules and minStrength. Use it fills both fields and shows the text." },
+        { name: "passphraseOptions", type: "{ words?, count?, separators?, randomCase? }", default: "546 words, 5 words", description: "Word list, word count and separators for the suggestion." },
+        { name: "suggestText / useSuggestionText / anotherSuggestionText / dismissSuggestionText", type: "string", default: '"Suggest a passphrase" / "Use it" / "Another" / "Dismiss suggestion"', description: "Suggestion wording." },
+        { name: "suggestionStrengthText", type: "(time: string) => string", description: "Sentence under the suggestion. Its crack time comes from the real entropy, assuming the attacker knows the method." },
+        { name: "suggestionUsedText", type: "string", description: "Announced after a suggestion is filled in." },
         { name: "className", type: "string", description: "Classes for the root." },
       ]}
       types={[

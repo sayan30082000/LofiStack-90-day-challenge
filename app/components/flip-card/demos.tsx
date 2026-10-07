@@ -8,6 +8,66 @@ import { cn } from "@/lib/utils";
 const ghostButton =
   "inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-800 outline-none transition-colors hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-indigo-500 active:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800 dark:active:bg-zinc-700";
 
+/* ---------- Physical postcard ---------- */
+
+export function PostcardDemo() {
+  const [flips, setFlips] = useState(0);
+  const [peeking, setPeeking] = useState(false);
+
+  return (
+    <div className="flex w-full max-w-md flex-col gap-3">
+      <FlipCard
+        className="aspect-[3/2] w-full"
+        label="Turn the postcard over"
+        onFlip={() => setFlips((n) => n + 1)}
+        onPeek={setPeeking}
+        front={
+          <div className="relative h-full bg-[linear-gradient(160deg,#0ea5e9_0%,#6366f1_45%,#f59e0b_100%)] p-5 text-white">
+            <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/3 bg-[radial-gradient(60%_100%_at_30%_100%,rgb(16_185_129/0.85),transparent_70%),radial-gradient(50%_90%_at_80%_100%,rgb(5_150_105/0.9),transparent_70%)]" />
+            <p className="relative text-xs font-semibold uppercase tracking-[0.2em] text-white/90">Greetings from</p>
+            <p className="relative mt-1 text-3xl font-bold tracking-tight drop-shadow sm:text-4xl">Sajek Valley</p>
+            <p className="absolute bottom-4 left-5 rounded-md bg-black/35 px-2 py-1 text-xs font-medium backdrop-blur-sm">
+              Press near an edge
+            </p>
+          </div>
+        }
+        back={
+          <div className="grid h-full grid-cols-[1fr_auto] gap-4 bg-[#fdfaf3] p-5 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+            <div className="flex flex-col">
+              <p className="font-serif text-base italic leading-relaxed">
+                Clouds below us at sunrise. Pressing a card’s edge to turn it feels right, doesn’t it?
+              </p>
+              <p className="mt-auto font-serif italic">— S.</p>
+            </div>
+            <div className="flex w-24 flex-col gap-3 border-l border-dashed border-zinc-300 pl-4 pr-10 dark:border-zinc-700 sm:w-32">
+              <div aria-hidden className="ml-auto mt-10 grid size-12 place-items-center rounded-sm border-2 border-dotted border-rose-400 text-[10px] font-bold text-rose-500">
+                ৳10
+              </div>
+              <span aria-hidden className="h-px bg-zinc-300 dark:bg-zinc-700" />
+              <span aria-hidden className="h-px bg-zinc-300 dark:bg-zinc-700" />
+              <span aria-hidden className="h-px bg-zinc-300 dark:bg-zinc-700" />
+            </div>
+          </div>
+        }
+      />
+      <ul className="grid grid-cols-1 gap-1 text-xs text-zinc-600 sm:grid-cols-3 dark:text-zinc-400">
+        <li>
+          <b className="font-medium text-zinc-800 dark:text-zinc-200">Press an edge:</b> it turns away from your finger
+        </li>
+        <li>
+          <b className="font-medium text-zinc-800 dark:text-zinc-200">Hover:</b> it leans toward the way it will turn
+        </li>
+        <li>
+          <b className="font-medium text-zinc-800 dark:text-zinc-200">Hold:</b> peek at the back, let go to return
+        </li>
+      </ul>
+      <p aria-live="polite" className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+        flips: {flips} · peeking: {peeking ? "yes" : "no"}
+      </p>
+    </div>
+  );
+}
+
 /* ---------- Flashcard deck ---------- */
 
 const WORDS = [
@@ -71,7 +131,7 @@ export function FlashcardDemo() {
                 <p className="text-3xl font-semibold tracking-tight">{card.word}</p>
                 <p className="mt-1 font-mono text-sm text-zinc-600 dark:text-zinc-400">{card.phonetic}</p>
               </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">Tap the card to reveal the meaning</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Tap anywhere to flip, or press and hold to peek</p>
             </div>
           }
           back={

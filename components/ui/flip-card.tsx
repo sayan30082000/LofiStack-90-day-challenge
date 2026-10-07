@@ -1,11 +1,20 @@
 "use client";
 
-import { useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type FlipCardTrigger = "click" | "hover";
-export type FlipCardDirection = "horizontal" | "vertical";
+/** auto: flips sideways or up/down depending on which edge you press, like a real card. */
+export type FlipCardDirection = "auto" | "horizontal" | "vertical";
 export type FlipCardControlPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface FlipCardProps {
@@ -18,7 +27,11 @@ export interface FlipCardProps {
    * hover: pointer hover flips it; touch taps and the flip button still toggle.
    */
   trigger?: FlipCardTrigger;
-  /** horizontal rotates around the Y axis, vertical around the X axis. */
+  /**
+   * auto picks the axis from where you press (near the left/right edges: sideways, near top/bottom: up/down).
+   * horizontal always turns around the Y axis, vertical around the X axis.
+   * In every mode the card turns away from the point you press.
+   */
   direction?: FlipCardDirection;
   /** Shows the back face (controlled). */
   flipped?: boolean;
@@ -36,6 +49,16 @@ export interface FlipCardProps {
   controlIcon?: ReactNode;
   /** In click mode, clicks on the card surface flip it (clicks on interactive content never do). */
   flipOnSurfaceClick?: boolean;
+  /** Tilts the card a few degrees toward a hovering mouse, previewing which way it will turn. */
+  tiltHint?: boolean;
+  /** Largest tilt in degrees. */
+  tiltAngle?: number;
+  /** Press and hold the surface to peek at the other side; letting go turns it back. */
+  peekOnHold?: boolean;
+  /** Milliseconds of holding before a peek starts. A shorter press is a normal click. */
+  peekDelay?: number;
+  /** Called when a peek starts (true) and ends (false). */
+  onPeek?: (peeking: boolean) => void;
   /** Flip duration in milliseconds. */
   duration?: number;
   /** Perspective distance in pixels. Smaller is more dramatic. */
@@ -49,6 +72,14 @@ export interface FlipCardProps {
   frontClassName?: string;
   backClassName?: string;
   controlClassName?: string;
+}
+
+type Axis = "x" | "y";
+interface Press {
+  /** -1 (left) … 1 (right) */
+  nx: number;
+  /** -1 (top) … 1 (bottom) */
+  ny: number;
 }
 
 const INTERACTIVE = 'a[href],button,input,select,textarea,label,summary,[role="button"],[role="link"],[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
@@ -69,11 +100,37 @@ const STYLES = `
 @keyframes lofi-flip-card-lift-b { 0%, 100% { transform: scale(1); } 45% { transform: scale(.94); } }
 `;
 
+const TILT_MS = 180;
+
+function pressOf(e: { clientX: number; clientY: number; currentTarget: Element }): Press {
+  const r = e.currentTarget.getBoundingClientRect();
+  const nx = r.width ? ((e.clientX - r.left) / r.width) * 2 - 1 : 0;
+  const ny = r.height ? ((e.clientY - r.top) / r.height) * 2 - 1 : 0;
+  return { nx: Math.max(-1, Math.min(1, nx)), ny: Math.max(-1, Math.min(1, ny)) };
+}
+
+/** Which axis to turn around, and the sign that pushes the pressed edge away from the viewer. */
+function turnFor(direction: FlipCardDirection, press: Press | undefined, fallback: Axis): { axis: Axis; sign: 1 | -1 } {
+  const axis: Axis =
+    direction === "horizontal"
+      ? "y"
+      : direction === "vertical"
+        ? "x"
+        : press
+          ? Math.abs(press.nx) >= Math.abs(press.ny)
+            ? "y"
+            : "x"
+          : fallback;
+  // rotateY(+) moves the right edge back; rotateX(-) moves the bottom edge back.
+  if (axis === "y") return { axis, sign: !press || press.nx >= 0 ? 1 : -1 };
+  return { axis, sign: !press || press.ny >= 0 ? -1 : 1 };
+}
+
 export function FlipCard({
   front,
   back,
   trigger = "click",
-  direction = "horizontal",
+  direction = "auto",
   flipped: flippedProp,
   defaultFlipped = false,
   onFlip,
@@ -82,6 +139,11 @@ export function FlipCard({
   controlPosition = "top-right",
   controlIcon,
   flipOnSurfaceClick = true,
+  tiltHint = true,
+  tiltAngle = 7,
+  peekOnHold = true,
+  peekDelay = 350,
+  onPeek,
   duration = 700,
   perspective = 1200,
   disabled = false,
@@ -93,43 +155,131 @@ export function FlipCard({
 }: FlipCardProps) {
   const [inner, setInner] = useState(defaultFlipped);
   const flipped = flippedProp ?? inner;
+  const [peeking, setPeeking] = useState(false);
+  // The side on screen: a peek shows the other side without changing `flipped`.
+  const shown = flipped !== peeking;
+
+  const [turn, setTurn] = useState<{ axis: Axis; sign: 1 | -1 }>(() =>
+    turnFor(direction, undefined, direction === "vertical" ? "x" : "y"),
+  );
+  const [tilt, setTilt] = useState<{ axis: Axis; deg: number } | null>(null);
+  const [animMs, setAnimMs] = useState(duration);
+
   const lastPointer = useRef<string>("mouse");
+  const flipAt = useRef(0);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peeked = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    },
+    [],
+  );
 
   // Restart the "lift" animation on every change of side, without animating on mount.
   const [lift, setLift] = useState<"" | "a" | "b">("");
-  const [prevFlipped, setPrevFlipped] = useState(flipped);
-  if (prevFlipped !== flipped) {
-    setPrevFlipped(flipped);
-    setLift(flipped ? "a" : "b");
+  const [prevShown, setPrevShown] = useState(shown);
+  if (prevShown !== shown) {
+    setPrevShown(shown);
+    setLift(shown ? "a" : "b");
   }
 
-  const setFlipped = (next: boolean) => {
+  /** Picks the turn for the next change of side. The axis can only change while the front is up. */
+  const aim = (press?: Press) => {
+    // Turning back to the front keeps the axis, so the card returns the way it came.
+    if (!shown) setTurn(turnFor(direction, press, turn.axis));
+    setTilt(null);
+    setAnimMs(duration);
+    flipAt.current = performance.now();
+  };
+
+  const setFlipped = (next: boolean, press?: Press) => {
     if (disabled || next === flipped) return;
+    aim(press);
     if (flippedProp === undefined) setInner(next);
     onFlip?.(next);
   };
 
-  const onSurfaceClick = (e: MouseEvent<HTMLDivElement>) => {
-    if (disabled) return;
-    const target = e.target as HTMLElement;
-    const hit = target.closest(INTERACTIVE);
-    if (hit && e.currentTarget.contains(hit) && hit !== e.currentTarget) return;
-    if (window.getSelection()?.toString()) return;
-    if (trigger === "click" && flipOnSurfaceClick) setFlipped(!flipped);
-    // Hover cards on touch screens: a tap toggles.
-    else if (trigger === "hover" && lastPointer.current !== "mouse") setFlipped(!flipped);
+  const endPeek = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    if (peeking) {
+      aim();
+      setPeeking(false);
+      onPeek?.(false);
+    }
   };
 
-  const onPointerEnter = (e: PointerEvent) => {
-    lastPointer.current = e.pointerType;
-    if (trigger === "hover" && e.pointerType === "mouse") setFlipped(true);
+  const isOnInteractive = (target: EventTarget, root: HTMLElement) => {
+    const hit = (target as HTMLElement).closest?.(INTERACTIVE);
+    return Boolean(hit && root.contains(hit) && hit !== root);
   };
-  const onPointerLeave = (e: PointerEvent) => {
+
+  const onSurfaceClick = (e: MouseEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    if (peeked.current) {
+      // The click that ends a hold-to-peek should not also flip the card.
+      peeked.current = false;
+      return;
+    }
+    if (isOnInteractive(e.target, e.currentTarget)) return;
+    if (window.getSelection()?.toString()) return;
+    const press = pressOf(e);
+    if (trigger === "click" && flipOnSurfaceClick) setFlipped(!flipped, press);
+    // Hover cards on touch screens: a tap toggles.
+    else if (trigger === "hover" && lastPointer.current !== "mouse") setFlipped(!flipped, press);
+  };
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    lastPointer.current = e.pointerType;
+    peeked.current = false;
+    if (!peekOnHold || disabled || trigger !== "click" || e.button !== 0) return;
+    if (isOnInteractive(e.target, e.currentTarget)) return;
+    const press = pressOf(e);
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      peeked.current = true;
+      aim(press);
+      setPeeking(true);
+      onPeek?.(true);
+    }, peekDelay);
+  };
+
+  const onPointerEnter = (e: PointerEvent<HTMLDivElement>) => {
+    lastPointer.current = e.pointerType;
+    if (trigger === "hover" && e.pointerType === "mouse") setFlipped(true, pressOf(e));
+  };
+
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!tiltHint || disabled || shown || trigger !== "click" || e.pointerType !== "mouse") return;
+    if (performance.now() - flipAt.current < duration) return;
+    const press = pressOf(e);
+    const { axis, sign } = turnFor(direction, press, turn.axis);
+    const strength = Math.max(Math.abs(press.nx), Math.abs(press.ny));
+    const deg = Math.round(sign * tiltAngle * strength * 10) / 10;
+    if (tilt && tilt.axis === axis && Math.abs(tilt.deg - deg) < 0.5) return;
+    setAnimMs(TILT_MS);
+    setTilt({ axis, deg });
+  };
+
+  const onPointerLeave = (e: PointerEvent<HTMLDivElement>) => {
+    endPeek();
+    if (tilt) {
+      setAnimMs(TILT_MS);
+      setTilt(null);
+    }
     if (trigger === "hover" && e.pointerType === "mouse") setFlipped(false);
   };
 
-  const horizontal = direction === "horizontal";
-  const turned = horizontal ? "motion-safe:[transform:rotateY(180deg)]" : "motion-safe:[transform:rotateX(180deg)]";
+  // Both rotations are always listed so CSS interpolates each angle on its own.
+  const half = shown ? turn.sign * 180 : 0;
+  const rx = (turn.axis === "x" ? half : 0) + (!shown && tilt?.axis === "x" ? tilt.deg : 0);
+  const ry = (turn.axis === "y" ? half : 0) + (!shown && tilt?.axis === "y" ? tilt.deg : 0);
+  const backTurn = turn.axis === "x" ? "rotateX(180deg)" : "rotateY(180deg)";
+
   const surface =
     faceClassName ??
     "overflow-hidden rounded-xl border border-zinc-200 bg-white text-zinc-900 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100";
@@ -139,12 +289,17 @@ export function FlipCard({
   return (
     <div
       onClick={onSurfaceClick}
-      onPointerDown={(e) => (lastPointer.current = e.pointerType)}
+      onPointerDown={onPointerDown}
+      onPointerUp={endPeek}
+      onPointerCancel={endPeek}
       onPointerEnter={onPointerEnter}
+      onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
+      onContextMenu={(e) => peeked.current && e.preventDefault()}
       data-flipped={flipped || undefined}
+      data-peeking={peeking || undefined}
       className={cn(
-        "group/flip relative isolate",
+        "group/flip relative isolate touch-manipulation [-webkit-touch-callout:none]",
         !disabled && (trigger === "click" ? flipOnSurfaceClick && "cursor-pointer" : "cursor-default"),
         disabled && "opacity-60",
         className,
@@ -157,23 +312,26 @@ export function FlipCard({
 
       <div className={cn("h-full", lift && `lofi-flip-card-lift-${lift}`)} style={{ perspective: `${perspective}px` }}>
         <div
-          className={cn(
-            "grid h-full [transform-style:preserve-3d] motion-safe:transition-transform motion-safe:ease-[cubic-bezier(0.3,1.2,0.4,1)]",
-            flipped && turned,
-          )}
-          style={{ transitionDuration: `${duration}ms` }}
+          className="grid h-full [transform-style:preserve-3d] motion-safe:[transform:var(--lofi-flip-rot)] motion-safe:transition-transform motion-safe:ease-[cubic-bezier(0.3,1.2,0.4,1)]"
+          style={
+            {
+              "--lofi-flip-rot": `rotateX(${rx}deg) rotateY(${ry}deg)`,
+              transitionDuration: `${animMs}ms`,
+            } as CSSProperties
+          }
         >
           <div
-            aria-hidden={flipped || undefined}
-            inert={flipped}
-            className={cn(face, surface, frontClassName, flipped && "motion-reduce:opacity-0")}
+            aria-hidden={shown || undefined}
+            inert={shown}
+            className={cn(face, surface, frontClassName, shown && "motion-reduce:opacity-0")}
           >
             {front}
           </div>
           <div
-            aria-hidden={!flipped || undefined}
-            inert={!flipped}
-            className={cn(face, turned, surface, backClassName, !flipped && "motion-reduce:opacity-0")}
+            aria-hidden={!shown || undefined}
+            inert={!shown}
+            className={cn(face, "motion-safe:[transform:var(--lofi-flip-back)]", surface, backClassName, !shown && "motion-reduce:opacity-0")}
+            style={{ "--lofi-flip-back": backTurn } as CSSProperties}
           >
             {back}
           </div>
@@ -198,10 +356,7 @@ export function FlipCard({
           {controlIcon ?? (
             <RefreshCw
               aria-hidden
-              className={cn(
-                "size-4 transition-transform duration-500 motion-reduce:transition-none",
-                flipped && "rotate-180",
-              )}
+              className={cn("size-4 transition-transform duration-500 motion-reduce:transition-none", flipped && "rotate-180")}
             />
           )}
         </button>

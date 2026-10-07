@@ -104,7 +104,7 @@ export function SignUpDemo() {
         {status === "loading" ? "Creating account…" : "Create account"}
       </button>
       <p className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
-        Try <span className="font-mono">Password123!</span>: it passes every rule but is on the common list.
+        Try <span className="font-mono">Password123!</span>: it passes every rule but is on the leaked list. Or tap Suggest a passphrase.
       </p>
     </form>
   );
@@ -176,6 +176,8 @@ export function CompactDemo() {
           value={a}
           onChange={(v) => setA(v)}
           showChecklist={false}
+          showTips={false}
+          suggestPassphrase={false}
           minStrength={2}
           placeholder="Type to see the meter"
           autoComplete="off"
