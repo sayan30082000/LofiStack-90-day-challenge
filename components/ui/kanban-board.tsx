@@ -717,7 +717,7 @@ function SortableCard({
       >
         {children}
         {card.disabled && (
-          <span className="absolute right-2 top-2 text-zinc-400 dark:text-zinc-500" title={labels.locked}>
+          <span className="absolute right-2 top-2 text-zinc-500 dark:text-zinc-400" title={labels.locked}>
             <Lock className="size-3.5" aria-hidden />
             <span className="sr-only">{labels.locked}</span>
           </span>

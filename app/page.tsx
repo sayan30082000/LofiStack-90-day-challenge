@@ -193,7 +193,7 @@ function WeekCard({ week }: { week: Week }) {
                   Agent task · <span className="font-normal text-zinc-500 dark:text-zinc-400">{week.agentPlan.kind}</span>
                 </p>
                 <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
-                  {week.agentPlan.task} <span className="text-zinc-400 dark:text-zinc-500">· {week.agentPlan.agent}</span>
+                  {week.agentPlan.task} <span className="text-zinc-500 dark:text-zinc-400">· {week.agentPlan.agent}</span>
                 </p>
               </div>
             ) : (
@@ -238,7 +238,7 @@ function ComponentTitle({ c }: { c: PlannedComponent }) {
   const level = LEVELS[c.lvl];
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="font-mono text-xs text-zinc-400 dark:text-zinc-500">#{String(c.n).padStart(2, "0")}</span>
+      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">#{String(c.n).padStart(2, "0")}</span>
       <span className="font-medium">{c.name}</span>
       <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 font-mono text-[11px] font-medium text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
         {c.type}
@@ -290,7 +290,7 @@ function Stat({ label, value, total }: { label: string; value: number; total: nu
       <dt className="text-xs text-zinc-500 dark:text-zinc-400">{label}</dt>
       <dd className="mt-1 text-2xl font-semibold tabular-nums">
         {value}
-        <span className="text-base font-normal text-zinc-400 dark:text-zinc-500"> / {total}</span>
+        <span className="text-base font-normal text-zinc-500 dark:text-zinc-400"> / {total}</span>
       </dd>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800" aria-hidden>
         <div

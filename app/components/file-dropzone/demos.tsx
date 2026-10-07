@@ -10,7 +10,7 @@ function FilesReadout({ files, emptyText }: { files: File[]; emptyText: string }
       {files.length === 0 ? (
         <p className="text-zinc-500 dark:text-zinc-400">{emptyText}</p>
       ) : (
-        <pre className="overflow-x-auto rounded-lg bg-zinc-100 p-3 font-mono text-xs leading-relaxed dark:bg-zinc-800/70">
+        <pre tabIndex={0} role="region" aria-label="Selected files" className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 rounded-lg bg-zinc-100 p-3 font-mono text-xs leading-relaxed dark:bg-zinc-800/70">
           {JSON.stringify(
             files.map((f) => ({ name: f.name, size: formatBytes(f.size), type: f.type || "unknown" })),
             null,

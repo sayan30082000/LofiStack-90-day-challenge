@@ -14,7 +14,8 @@ export async function CodeBlock({ code, lang = "tsx", filename, className }: Cod
   const source = code.trim();
   const html = await codeToHtml(source, {
     lang,
-    themes: { light: "github-light", dark: "github-dark" },
+    // High-contrast variants keep every token above 4.5:1 (WCAG 1.4.3).
+    themes: { light: "github-light-high-contrast", dark: "github-dark-high-contrast" },
     defaultColor: false,
   });
 
@@ -29,8 +30,12 @@ export async function CodeBlock({ code, lang = "tsx", filename, className }: Cod
         <span className="truncate font-mono text-xs text-zinc-500 dark:text-zinc-400">{filename ?? lang}</span>
         <CopyButton value={source} />
       </div>
+      {/* Focusable so keyboard users can scroll long lines (WCAG 2.1.1). */}
       <div
-        className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed [&_pre]:outline-none"
+        tabIndex={0}
+        role="region"
+        aria-label={filename ? `${filename} code` : "Code"}
+        className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 [&_pre]:outline-none"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>

@@ -102,7 +102,8 @@ const allComponents: RegistryEntry[] = [
     name: "Pricing Cards",
     type: "card",
     week: 4,
-    description: "Plan cards with monthly/yearly toggle and animated prices.",
+    description:
+      "Pricing cards with a plan finder: set team size and storage, and the cheapest plan that fits is marked \"Best fit for you\" while too-small plans say why. Plus a monthly/yearly toggle with odometer prices.",
     addedAt: "2026-10-02",
     codePath: "pricing-cards.tsx",
   },
@@ -112,7 +113,8 @@ const allComponents: RegistryEntry[] = [
     name: "Type-to-Confirm Dialog",
     type: "modal",
     week: 4,
-    description: "Destructive confirm that needs the resource name typed in.",
+    description:
+      "A delete confirmation whose friction matches the damage: it shows exactly what will be lost, asks you to type the name only when that's a lot, and gives an undo window before anything is deleted.",
     addedAt: "2026-10-02",
     codePath: "confirm-dialog.tsx",
   },

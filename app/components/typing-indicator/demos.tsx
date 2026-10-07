@@ -103,7 +103,7 @@ export function MirrorDemo() {
 function Chip({ label, value }: { label: string; value: string }) {
   return (
     <span className="inline-flex h-7 items-center gap-1 rounded-md bg-zinc-100 px-2 font-mono dark:bg-zinc-800">
-      <span className="text-zinc-500 dark:text-zinc-400">{label}</span>
+      <span className="text-zinc-600 dark:text-zinc-400">{label}</span>
       <span className="font-medium" aria-live="off">
         {value}
       </span>
@@ -153,7 +153,7 @@ export function LooksDemo() {
     { label: "paused", activity: "paused" },
   ];
   return (
-    <div className="w-full max-w-3xl overflow-x-auto">
+    <div tabIndex={0} role="region" aria-label="Looks and states" className="w-full max-w-3xl overflow-x-auto rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500">
       <table className="w-full min-w-[560px] border-separate border-spacing-y-2 text-left text-sm">
         <thead>
           <tr className="text-xs text-zinc-500 dark:text-zinc-400">

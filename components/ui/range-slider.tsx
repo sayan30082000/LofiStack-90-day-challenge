@@ -485,7 +485,7 @@ export function RangeSlider({
       {showInputs && (
         <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
           {renderField(0)}
-          <span aria-hidden className="pt-8 text-zinc-400 dark:text-zinc-500">
+          <span aria-hidden className="pt-8 text-zinc-500 dark:text-zinc-400">
             {separator}
           </span>
           {renderField(1)}

@@ -47,6 +47,7 @@ All 30 components of the 90 day plan, 2 per week.
 
 - **Docs:** [docs/](docs/README.md) has one page per released component, generated from the TypeScript props (types, defaults, JSDoc) by `npm run docs`.
 - **Tests:** `npm test` runs the Vitest + Testing Library suite in `tests/`.
+- **Accessibility:** `npm run a11y` audits the running site with axe-core (WCAG 2.2 AA) in Chrome, light and dark, at 375px and 1280px, and writes [docs/a11y-report.md](docs/a11y-report.md). Set `BASE_URL` to audit the live site.
 
 ## Run locally
 

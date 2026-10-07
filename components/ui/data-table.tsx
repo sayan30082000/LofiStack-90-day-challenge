@@ -412,7 +412,7 @@ export function DataTable<T>({
               <label htmlFor={searchId} className="sr-only">
                 {L.search}
               </label>
-              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" />
+              <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" />
               <input
                 id={searchId}
                 type="search"

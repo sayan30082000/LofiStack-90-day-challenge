@@ -769,7 +769,7 @@ export function TreeView({
                       <Folder className="size-4 text-sky-600 dark:text-sky-400" />
                     )
                   ) : (
-                    <File className="size-4 text-zinc-400 dark:text-zinc-500" />
+                    <File className="size-4 text-zinc-500 dark:text-zinc-400" />
                   ))}
               </span>
             )}

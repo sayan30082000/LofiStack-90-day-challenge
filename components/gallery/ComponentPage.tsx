@@ -57,7 +57,7 @@ export function ComponentPage({ slug, examples, usage, props, types = [], access
             {entry.type}
           </span>
           <span className="text-zinc-500 dark:text-zinc-400">Week {String(entry.week).padStart(2, "0")}</span>
-          <span className="font-mono text-zinc-400 dark:text-zinc-500">/components/{entry.slug}</span>
+          <span className="font-mono text-zinc-500 dark:text-zinc-400">/components/{entry.slug}</span>
         </div>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{entry.name}</h1>
         <p className="mt-3 text-base text-zinc-600 sm:text-lg dark:text-zinc-400">{entry.description}</p>
@@ -102,7 +102,7 @@ export function ComponentPage({ slug, examples, usage, props, types = [], access
                 <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">prompt</span>
                 <CopyButton value={prompt} label="Copy prompt" />
               </div>
-              <pre className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words p-4 font-mono text-[13px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+              <pre tabIndex={0} role="region" aria-label="Build prompt text" className="max-h-[32rem] overflow-y-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 whitespace-pre-wrap break-words p-4 font-mono text-[13px] leading-relaxed text-zinc-800 dark:text-zinc-200">
                 {prompt}
               </pre>
             </div>
@@ -144,7 +144,7 @@ function PropsTable({ title, id, rows }: { title: string; id: string; rows: Prop
       <h2 id={id} className="text-lg font-semibold tracking-tight">
         {title}
       </h2>
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <div tabIndex={0} role="region" aria-label={`${title} table`} className="overflow-x-auto rounded-xl border border-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-zinc-800">
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
             <tr>

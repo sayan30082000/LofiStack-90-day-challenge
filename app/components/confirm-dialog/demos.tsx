@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type ReactNode } from "react";
-import { Archive, BookMarked, Eye, GitFork, RotateCcw, Star, Trash2, UserMinus } from "lucide-react";
+import { Archive, BookMarked, Eye, Folder, GitFork, RotateCcw, Star, Trash2, UserMinus } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,103 @@ const secondaryBtn =
 
 const dangerBtn =
   "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-rose-300 bg-white px-3.5 text-sm font-medium text-rose-700 outline-none transition-colors hover:border-rose-600 hover:bg-rose-600 hover:text-white focus-visible:ring-2 focus-visible:ring-rose-500 active:bg-rose-700 motion-reduce:transition-none dark:border-rose-500/40 dark:bg-zinc-900 dark:text-rose-400 dark:hover:border-rose-500 dark:hover:bg-rose-600 dark:hover:text-white";
+
+/* ---------- Friction that matches the damage, with undo ---------- */
+
+interface FolderItem {
+  id: string;
+  name: string;
+  files: number;
+  collaborators: number;
+  size: string;
+}
+
+const FOLDERS: FolderItem[] = [
+  { id: "notes", name: "scratch-notes", files: 2, collaborators: 0, size: "14 KB" },
+  { id: "assets", name: "brand-assets", files: 48, collaborators: 3, size: "1.2 GB" },
+  { id: "exports", name: "old-exports", files: 1, collaborators: 0, size: "3 MB" },
+];
+
+export function UndoDemo() {
+  const [folders, setFolders] = useState(FOLDERS);
+  const [target, setTarget] = useState<FolderItem | null>(null);
+  const [open, setOpen] = useState(false);
+  const [log, setLog] = useState<string[]>([]);
+  const listRef = useRef<HTMLUListElement>(null);
+  const note = (line: string) => setLog((l) => [line, ...l].slice(0, 3));
+
+  return (
+    <div className="flex w-full max-w-lg flex-col gap-3">
+      <ul
+        ref={listRef}
+        tabIndex={-1}
+        aria-label="Folders"
+        className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white outline-none dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900"
+      >
+        {folders.length === 0 && <li className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">No folders left.</li>}
+        {folders.map((f) => (
+          <li key={f.id} className="flex items-center gap-3 px-4 py-3">
+            <Folder className="size-5 shrink-0 text-sky-600 dark:text-sky-400" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-mono text-sm font-medium">{f.name}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {f.files} {f.files === 1 ? "file" : "files"} · {f.size}
+                {f.collaborators > 0 && ` · shared with ${f.collaborators}`}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label={`Delete ${f.name}`}
+              onClick={() => {
+                setTarget(f);
+                setOpen(true);
+              }}
+              className={cn(secondaryBtn, "size-10 px-0 text-zinc-500 hover:text-rose-700 dark:text-zinc-400 dark:hover:text-rose-400")}
+            >
+              <Trash2 className="size-4" aria-hidden />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button type="button" onClick={() => setFolders(FOLDERS)} disabled={folders.length === FOLDERS.length} className={secondaryBtn}>
+          <RotateCcw className="size-4" aria-hidden /> Reset folders
+        </button>
+        <ul aria-label="What happened" className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
+          {log.length === 0 ? <li>Delete a small folder, then the big one.</li> : log.map((l, i) => <li key={i}>{l}</li>)}
+        </ul>
+      </div>
+
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={`Delete ${target?.name ?? ""}?`}
+        description="It moves out of every project that uses it."
+        resourceName={target?.name ?? ""}
+        impact={
+          target
+            ? [
+                { value: target.files, label: target.files === 1 ? "file" : "files" },
+                ...(target.collaborators ? [{ value: target.collaborators, label: "collaborators lose access" }] : []),
+                { value: target.size, label: "of storage" },
+              ]
+            : []
+        }
+        friction="auto"
+        autoTypeAt={10}
+        undoWindow={8000}
+        confirmLabel="Delete folder"
+        onUndo={() => note(`Undo: ${target?.name} kept`)}
+        onConfirm={async () => {
+          await wait(600);
+          setFolders((list) => list.filter((f) => f.id !== target?.id));
+          note(`Deleted ${target?.name}`);
+        }}
+        finalFocusRef={listRef}
+      />
+    </div>
+  );
+}
 
 export function DangerZoneDemo() {
   const failId = useId();

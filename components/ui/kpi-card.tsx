@@ -306,7 +306,7 @@ export function KpiCard({
           <p className="-mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
             {labels.versus} {period}
             {previousValue !== undefined && (
-              <span className="text-zinc-400 dark:text-zinc-500"> · {fmt.format(previousValue)}</span>
+              <span className="text-zinc-500 dark:text-zinc-400"> · {fmt.format(previousValue)}</span>
             )}
           </p>
           {trend && trend.length > 1 && (

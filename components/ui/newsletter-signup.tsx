@@ -309,7 +309,7 @@ export function NewsletterSignup({
                   aria-hidden
                   className={cn(
                     "pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 transition-colors motion-reduce:transition-none",
-                    hasError ? "text-rose-500 dark:text-rose-400" : "text-zinc-400 dark:text-zinc-500",
+                    hasError ? "text-rose-500 dark:text-rose-400" : "text-zinc-500 dark:text-zinc-400",
                   )}
                 />
                 <input

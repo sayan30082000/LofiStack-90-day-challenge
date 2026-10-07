@@ -75,7 +75,7 @@ export function PromptDialog({
               <X className="size-4" aria-hidden />
             </button>
           </div>
-          <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words bg-zinc-50 px-5 py-4 font-mono text-[12.5px] leading-relaxed text-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-200">
+          <pre tabIndex={0} role="region" aria-label="Prompt text" className="min-h-0 flex-1 overflow-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 whitespace-pre-wrap break-words bg-zinc-50 px-5 py-4 font-mono text-[12.5px] leading-relaxed text-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-200">
             {prompt}
           </pre>
           <div className="flex flex-wrap justify-end gap-2 border-t border-zinc-200 px-5 py-3 dark:border-zinc-800">

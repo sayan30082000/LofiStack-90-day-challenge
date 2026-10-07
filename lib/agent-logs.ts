@@ -60,6 +60,16 @@ export const agentLogs: AgentLog[] = [
       "docs/ now has a page for each of the 6 released components, 195 props documented, regenerated in about a second with npm run docs. Its first draft built the import line from interface names and invented two exports that don't exist (TypingActivity, MeasureSkeleton); checking the output caught it and it now reads the real exports. Saved about 3 hours of hand-written docs, and every future week is documented for free.",
     automated: true,
   },
+  {
+    week: 4,
+    task: "Accessibility audit of every released page, fixing everything that fails",
+    agent: "Claude Code",
+    workflow:
+      "Asked Claude Code to audit the site with axe-core (WCAG 2.0, 2.1 and 2.2, A and AA) in my installed Chrome via playwright-core: the homepage and every released component page, light and dark, at 375px and 1280px, plus interactive states (open dialog, undo bar, plan finder, passphrase suggestion, changes-only tree). Fix each violation in the component, not the test, re-run until clean, and add a check to npm test so it stays clean.",
+    result:
+      "The first run found 420 violations (73 unique elements) on every page: faint grey text at 2.6:1 in light and 4.1:1 in dark mode, code-highlighting colours down to 3.3:1, a disabled field that faded its own labels, and scrollable tables, code blocks and prompts that keyboard users couldn't reach. After the fixes all 56 runs report 0 violations. npm run a11y re-runs the audit and writes docs/a11y-report.md, and 28 new axe tests in npm test (116 total) guard every demo. Saved about a day of manual checking.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -91,7 +101,7 @@ Add an "npm test" script, run the tests, fix any real bug you find in the compon
   {
     week: 4,
     kind: "Accessibility audit",
-    task: "Audit every component page for accessibility and fix what fails",
+    task: "Accessibility audit of every released page, fixing everything that fails",
     agent: "Claude Code",
     prompt: `Install @axe-core/playwright, start the site, and run axe on the homepage and every /components/<slug> page in light and dark mode at 375px and 1280px. Fix each violation in the component (not the test), re-run until clean, and give me a table: page, issue, WCAG rule, fix.`,
   },

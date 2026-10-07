@@ -4,10 +4,20 @@ import { PlansDemo, StatesDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "Pricing Cards",
-  description: "Plan cards with a monthly/yearly toggle, odometer-style price rolls and a featured plan.",
+  description:
+    "Pricing cards with a plan finder: set team size and storage, and the cheapest plan that fits is marked \"Best fit for you\" while too-small plans say why. Plus a monthly/yearly toggle with odometer prices.",
 };
 
 const plansCode = `
+// Plan finder: what the buyer needs, and each plan's limit (null = unlimited)
+const finder: PlanFinderDimension[] = [
+  { id: "seats", label: "Team size", unit: "seats", min: 1, max: 25, limits: { starter: 1, pro: 1, team: 10 } },
+  { id: "storage", label: "Asset storage", unit: "storage", min: 1, max: 600, defaultValue: 5,
+    format: (n) => \`\${n} GB\`, limits: { starter: 1, pro: 50, team: 500 } },
+];
+
+<PricingTable plans={plans} finder={finder} onRecommend={(id) => track("best_fit", id)} />
+
 const plans: PricingPlan[] = [
   {
     id: "starter",
@@ -95,10 +105,10 @@ export default function Page() {
         {
           title: "Starter, Pro and Team",
           description:
-            "Flip the billing toggle and each digit rolls to its new value. Yearly prices show the per-month rate, the billed total and the saving. Picking a plan shows a short loading state.",
+            "Move the Team size and Asset storage sliders: the cheapest plan that covers both is marked Best fit for you, too-small plans say exactly why, and past 10 seats nothing fits, so it points you to sales. Flip billing and each digit rolls.",
           preview: <PlansDemo />,
           code: plansCode,
-          minHeight: 640,
+          minHeight: 860,
         },
         {
           title: "States and currency",
@@ -118,6 +128,8 @@ export default function Page() {
         { name: "locale", type: "string", default: '"en-US"', description: "Locale used to format prices." },
         { name: "onSelect", type: "(planId: string, billing: Billing) => void | Promise<void>", description: "Fired by a CTA. A returned promise shows a spinner; a rejection shows its message under the button." },
         { name: "onBillingChange", type: "(billing: Billing) => void", description: "Fired when the toggle changes." },
+        { name: "finder", type: "PlanFinderDimension[]", description: "Plan finder sliders. The cheapest plan (at the current billing) whose limits cover every value is marked Best fit; too-small plans get a dashed border and a \"Too small: you need 12 seats\" line; if none fits, labels.noFit is shown." },
+        { name: "onRecommend", type: "(planId: string | null) => void", description: "Called when the recommended plan changes, null when nothing fits." },
         { name: "labels", type: "Partial<PricingLabels>", default: "defaultPricingLabels", description: "Override any text: toggle options, period, billed lines, free-plan line, saving chip, featured label, \"Not included\", live announcement, error and empty text." },
         { name: "className", type: "string", description: "Classes for the root. Columns follow the root's width (container queries): 1, then 2 from 576px, then 3 from 896px." },
       ]}
@@ -136,6 +148,22 @@ export default function Page() {
           ],
         },
         {
+          name: "PlanFinderDimension",
+          props: [
+            { name: "id / label / unit", type: "string", description: "Key, slider label and plural noun, e.g. \"seats\"." },
+            { name: "min / max / step / defaultValue", type: "number", default: "step 1, default min", description: "Slider range." },
+            { name: "format", type: "(value: number) => string", default: "`${n} ${unit}`", description: "Display text, e.g. (n) => `${n} GB`." },
+            { name: "limits", type: "Record<string, number | null>", description: "Highest value each plan supports, by plan id. null or missing = unlimited." },
+          ],
+        },
+        {
+          name: "Helpers",
+          props: [
+            { name: "recommendPlan(plans, billing, finder, values)", type: "string | null", description: "The cheapest plan that fits. Pure, so the server can use the same rule." },
+            { name: "fittingPlans(plans, billing, finder, values)", type: "PricingPlan[]", description: "Every plan that fits, cheapest first." },
+          ],
+        },
+        {
           name: "PricingCardProps",
           props: [
             { name: "plan", type: "PricingPlan", description: "The plan to render." },
@@ -150,6 +178,8 @@ export default function Page() {
         "Excluded features keep their text, add an sr-only \", Not included\" and use a dash icon, so the state never depends on color or strike-through alone.",
         "Each card is an article labelled by its plan name. The CTA sets aria-busy while loading, and errors render with role=\"alert\" and are linked with aria-describedby.",
         "CTAs and toggle options are at least 40px tall with a visible focus ring. Reduced motion turns off the digit roll, pill slide and chip pop.",
+        "The finder is a fieldset of native range inputs with labels and aria-valuetext (\"12 seats\"). The recommendation is announced politely after the slider settles, and the best-fit plan's heading includes \", Best fit for you\".",
+        "Plans that don't fit keep full text contrast: they're marked with a dashed border and a written reason, not faded out.",
       ]}
     />
   );

@@ -86,11 +86,11 @@ const LINK = cn(
   "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 active:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:active:bg-zinc-700",
 );
 const CURRENT = cn(CRUMB, "font-medium text-zinc-900 dark:text-zinc-50");
-const MUTED = cn(CRUMB, "cursor-not-allowed text-zinc-400 dark:text-zinc-500");
+const MUTED = cn(CRUMB, "cursor-not-allowed text-zinc-500 dark:text-zinc-400");
 
 function Separator({ separator }: { separator: BreadcrumbSeparator }) {
   return (
-    <li role="presentation" aria-hidden className="flex shrink-0 items-center text-zinc-400 dark:text-zinc-500">
+    <li role="presentation" aria-hidden className="flex shrink-0 items-center text-zinc-500 dark:text-zinc-400">
       {separator === "chevron" ? (
         <ChevronRight className="size-3.5" />
       ) : separator === "slash" ? (
@@ -273,7 +273,7 @@ function OverflowMenu({ hidden, expandLabel, renderLink }: OverflowMenuProps) {
               <>
                 {/* Indent each level a little so the hidden part of the path reads like a tree. */}
                 <span aria-hidden className="shrink-0" style={{ width: Math.min(i, 4) * 12 }} />
-                {i > 0 && <CornerDownRight aria-hidden className="size-3.5 shrink-0 text-zinc-400 dark:text-zinc-500" />}
+                {i > 0 && <CornerDownRight aria-hidden className="size-3.5 shrink-0 text-zinc-500 dark:text-zinc-400" />}
                 {item.icon && (
                   <span aria-hidden className="inline-flex shrink-0 [&>svg]:size-4">
                     {item.icon}
@@ -296,7 +296,7 @@ function OverflowMenu({ hidden, expandLabel, renderLink }: OverflowMenuProps) {
                     children: inner,
                   })
                 ) : (
-                  <span aria-disabled={item.disabled || undefined} className={cn(cls, "text-zinc-400 dark:text-zinc-500")}>
+                  <span aria-disabled={item.disabled || undefined} className={cn(cls, "text-zinc-500 dark:text-zinc-400")}>
                     {inner}
                   </span>
                 )}

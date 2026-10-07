@@ -294,7 +294,7 @@ export function PresetsDemo() {
         </div>
       </Labeled>
       <Labeled title="<SkeletonTableRow />">
-        <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <div tabIndex={0} role="region" aria-label="Table rows" className="overflow-x-auto rounded-xl border border-zinc-200 bg-white outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-zinc-800 dark:bg-zinc-900">
           <table className="w-full min-w-[420px] text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-600 dark:bg-zinc-950/40 dark:text-zinc-400">
               <tr>

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -10,7 +11,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, Loader2, Undo2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ConfirmDialogProps {
@@ -46,7 +47,60 @@ export interface ConfirmDialogProps {
   closeLabel?: string;
   /** Where focus goes on close when the element that opened the dialog is gone. */
   finalFocusRef?: RefObject<HTMLElement | null>;
+  /** What exactly will be lost, shown as numbers, e.g. [{ value: 12, label: "files" }]. */
+  impact?: ConfirmImpact[];
+  /** Heading above the impact numbers. */
+  impactTitle?: string;
+  /**
+   * type: always type the name. click: just the button. auto: typing only when the total of the
+   * numeric impact values reaches autoTypeAt, so small deletes stay quick and big ones get friction.
+   */
+  friction?: "type" | "click" | "auto";
+  /** Total impact at which friction="auto" asks for typing. */
+  autoTypeAt?: number;
+  /**
+   * Milliseconds to wait before running onConfirm. The dialog closes and an undo bar counts down;
+   * Undo cancels, Delete now skips the wait, and hovering or focusing the bar pauses it. 0 turns it off.
+   */
+  undoWindow?: number;
+  /** Called when the person presses Undo. */
+  onUndo?: () => void;
+  /** Undo bar wording. */
+  undoLabels?: Partial<UndoLabels>;
   className?: string;
+}
+
+export interface ConfirmImpact {
+  value: number | string;
+  label: string;
+}
+
+export interface UndoLabels {
+  /** Countdown line. Receives the resource name and whole seconds left. */
+  pending: (name: string, seconds: number) => string;
+  paused: (name: string) => string;
+  running: (name: string) => string;
+  done: (name: string) => string;
+  cancelled: string;
+  undo: string;
+  now: string;
+  dismiss: string;
+}
+
+export const DEFAULT_UNDO_LABELS: UndoLabels = {
+  pending: (name, s) => `Deleting ${name} in ${s}s`,
+  paused: (name) => `Paused. ${name} will be deleted when you continue.`,
+  running: (name) => `Deleting ${name}…`,
+  done: (name) => `${name} was deleted.`,
+  cancelled: "Undone. Nothing was deleted.",
+  undo: "Undo",
+  now: "Delete now",
+  dismiss: "Dismiss",
+};
+
+/** Sum of the numeric impact values, used by friction="auto". */
+export function impactTotal(impact: ConfirmImpact[] = []) {
+  return impact.reduce((n, i) => n + (typeof i.value === "number" ? i.value : 0), 0);
 }
 
 const FOCUSABLE =
@@ -82,12 +136,193 @@ const STYLES = `
  * Renders in place with fixed positioning, so it inherits the surrounding light/dark theme.
  */
 export function ConfirmDialog(props: ConfirmDialogProps) {
-  const { open } = props;
+  const { open, undoWindow = 0 } = props;
   // Keep the dialog mounted while the exit animation plays.
   const [rendered, setRendered] = useState(open);
   if (open && !rendered) setRendered(true);
-  if (!rendered) return null;
-  return <DialogBody {...props} closing={!open} onExited={() => setRendered(false)} />;
+  const [scheduled, setScheduled] = useState(0);
+  const gone = useCallback(() => setScheduled(0), []);
+
+  return (
+    <>
+      {rendered && (
+        <DialogBody
+          {...props}
+          closing={!open}
+          onExited={() => setRendered(false)}
+          onSchedule={undoWindow > 0 ? () => setScheduled((n) => n + 1) : undefined}
+        />
+      )}
+      {scheduled > 0 && (
+        <UndoBar
+          key={scheduled}
+          name={props.resourceName}
+          windowMs={undoWindow}
+          onConfirm={props.onConfirm}
+          onUndo={props.onUndo}
+          labels={{ ...DEFAULT_UNDO_LABELS, ...props.undoLabels }}
+          errorFallback={props.errorFallback ?? "Something went wrong. Nothing was deleted."}
+          onGone={gone}
+        />
+      )}
+    </>
+  );
+}
+
+type UndoStatus = "waiting" | "running" | "done" | "error" | "cancelled";
+
+/** Counts down, then runs onConfirm. Undo cancels; hovering or focusing it pauses the clock. */
+function UndoBar({
+  name,
+  windowMs,
+  onConfirm,
+  onUndo,
+  labels,
+  errorFallback,
+  onGone,
+}: {
+  name: string;
+  windowMs: number;
+  onConfirm: () => Promise<void>;
+  onUndo?: () => void;
+  labels: UndoLabels;
+  errorFallback: string;
+  onGone: () => void;
+}) {
+  const [left, setLeft] = useState(windowMs);
+  const [status, setStatus] = useState<UndoStatus>("waiting");
+  const [error, setError] = useState<string | null>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const paused = hovered || focused;
+  const onConfirmRef = useRef(onConfirm);
+  useEffect(() => {
+    onConfirmRef.current = onConfirm;
+  }, [onConfirm]);
+
+  const run = () => {
+    setStatus("running");
+    onConfirmRef.current()
+      .then(() => setStatus("done"))
+      .catch((e: unknown) => {
+        setError(e instanceof Error && e.message ? e.message : errorFallback);
+        setStatus("error");
+      });
+  };
+
+  // Count down against a deadline while waiting; pausing keeps what's left and resuming sets a new deadline.
+  const leftRef = useRef(windowMs);
+  useEffect(() => {
+    if (status !== "waiting" || paused) return;
+    const end = performance.now() + leftRef.current;
+    const t = setInterval(() => {
+      const ms = Math.max(0, end - performance.now());
+      leftRef.current = ms;
+      setLeft(ms);
+      if (ms === 0) {
+        clearInterval(t);
+        run();
+      }
+    }, 100);
+    return () => clearInterval(t);
+    // run reads onConfirm through a ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, paused]);
+
+  // Finished states fade away on their own.
+  useEffect(() => {
+    if (status !== "done" && status !== "cancelled") return;
+    const t = setTimeout(onGone, 3500);
+    return () => clearTimeout(t);
+  }, [status, onGone]);
+
+  const text =
+    status === "waiting"
+      ? paused
+        ? labels.paused(name)
+        : labels.pending(name, Math.ceil(left / 1000))
+      : status === "running"
+        ? labels.running(name)
+        : status === "done"
+          ? labels.done(name)
+          : status === "cancelled"
+            ? labels.cancelled
+            : error;
+
+  return (
+    <div className="fixed inset-x-0 bottom-4 z-[60] flex justify-center px-4">
+      <div
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        onFocus={() => setFocused(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false);
+        }}
+        className={cn(
+          "lofi-confirm-dialog-panel relative flex w-full max-w-md items-center gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm shadow-xl",
+          status === "error"
+            ? "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-500/30 dark:bg-rose-950 dark:text-rose-100"
+            : "border-zinc-200 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100",
+        )}
+      >
+        {status === "running" ? (
+          <Loader2 className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden />
+        ) : status === "waiting" ? (
+          <span aria-hidden className="relative inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[11px] font-bold tabular-nums text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+            {Math.ceil(left / 1000)}
+          </span>
+        ) : (
+          <AlertTriangle className={cn("size-4 shrink-0", status === "error" ? "text-rose-600" : "hidden")} aria-hidden />
+        )}
+        <p aria-hidden className="min-w-0 flex-1">
+          {text}
+        </p>
+        {/* Announced once per state, not every second of the countdown. */}
+        <p role="status" className="sr-only">
+          {status === "waiting" ? `${labels.pending(name, Math.ceil(windowMs / 1000))}. ${labels.undo} to cancel.` : text}
+        </p>
+        {status === "waiting" && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setStatus("cancelled");
+                onUndo?.();
+              }}
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-zinc-900 px-3 font-semibold text-white outline-none hover:bg-zinc-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 dark:focus-visible:ring-offset-zinc-900"
+            >
+              <Undo2 className="size-4" aria-hidden /> {labels.undo}
+            </button>
+            <button
+              type="button"
+              onClick={run}
+              className="inline-flex h-10 shrink-0 items-center rounded-lg px-2 font-medium text-rose-700 outline-none hover:bg-rose-50 focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-300 dark:hover:bg-rose-500/10"
+            >
+              {labels.now}
+            </button>
+          </>
+        )}
+        {(status === "error" || status === "done" || status === "cancelled") && (
+          <button
+            type="button"
+            onClick={onGone}
+            aria-label={labels.dismiss}
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:bg-white/10"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        )}
+        {status === "waiting" && (
+          <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 bg-rose-500/20">
+            <span
+              className="block h-full origin-left bg-rose-500 transition-transform duration-100 ease-linear motion-reduce:transition-none"
+              style={{ transform: `scaleX(${left / windowMs})` }}
+            />
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function DialogBody({
@@ -109,10 +344,15 @@ function DialogBody({
   errorFallback = "Something went wrong. Nothing was deleted.",
   closeLabel = "Close",
   finalFocusRef,
+  impact = [],
+  impactTitle = "You will lose",
+  friction = "type",
+  autoTypeAt = 10,
   className,
   closing,
   onExited,
-}: ConfirmDialogProps & { closing: boolean; onExited: () => void }) {
+  onSchedule,
+}: ConfirmDialogProps & { closing: boolean; onExited: () => void; onSchedule?: () => void }) {
   const titleId = useId();
   const descId = useId();
   const hintId = useId();
@@ -120,6 +360,9 @@ function DialogBody({
   const inputId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  // Friction follows the damage: typing only when it's required or the impact is big.
+  const needsTyping = friction === "type" || (friction === "auto" && impactTotal(impact) >= autoTypeAt);
   const [typed, setTyped] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +370,7 @@ function DialogBody({
   const norm = (s: string) => (caseSensitive ? s : s.toLowerCase());
   const target = norm(resourceName);
   const value = norm(typed);
-  const matches = value === target;
+  const matches = !needsTyping || value === target;
   // Length of the correctly typed prefix, for the per-character highlight.
   let prefix = 0;
   while (prefix < value.length && prefix < target.length && value[prefix] === target[prefix]) prefix++;
@@ -137,7 +380,8 @@ function DialogBody({
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    inputRef.current?.focus();
+    // Start on the input when typing is needed, otherwise on the safe choice.
+    (inputRef.current ?? cancelRef.current)?.focus();
     const root = document.documentElement;
     const scrollbar = window.innerWidth - root.clientWidth;
     const prevOverflow = root.style.overflow;
@@ -186,6 +430,12 @@ function DialogBody({
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!matches || loading || closing) return;
+    if (onSchedule) {
+      // Undo window: close now, the undo bar runs onConfirm when its countdown ends.
+      onSchedule();
+      onOpenChange(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -204,7 +454,7 @@ function DialogBody({
     <>
       <code
         aria-hidden
-        className="rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-[13px] font-semibold text-zinc-500 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700"
+        className="rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-[13px] font-semibold text-zinc-600 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700"
       >
         <span className="text-emerald-700 dark:text-emerald-400">{resourceName.slice(0, prefix)}</span>
         {wrong && prefix < resourceName.length ? (
@@ -275,6 +525,23 @@ function DialogBody({
             </button>
           </div>
 
+          {impact.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">{impactTitle}</p>
+              <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {impact.map((i) => (
+                  <li
+                    key={i.label}
+                    className="flex flex-col rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950/40"
+                  >
+                    <span className="text-lg font-semibold tabular-nums leading-6 text-rose-700 dark:text-rose-300">{i.value}</span>
+                    <span className="text-xs text-zinc-600 dark:text-zinc-400">{i.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {consequences.length > 0 && (
             <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3.5 dark:border-rose-500/20 dark:bg-rose-500/5">
               <p className="text-xs font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">{consequencesTitle}</p>
@@ -289,6 +556,7 @@ function DialogBody({
             </div>
           )}
 
+          {needsTyping && (
           <div className="flex flex-col gap-2">
             <label htmlFor={inputId} className="text-sm text-zinc-700 dark:text-zinc-300">
               {inputLabel(nameChip)}
@@ -338,6 +606,7 @@ function DialogBody({
               {matches ? matchedText : ""}
             </p>
           </div>
+          )}
 
           {error && (
             <div
@@ -352,6 +621,7 @@ function DialogBody({
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
+              ref={cancelRef}
               type="button"
               onClick={requestClose}
               disabled={loading}
@@ -369,7 +639,7 @@ function DialogBody({
                 matches
                   ? "bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 dark:bg-rose-600 dark:hover:bg-rose-500"
                   : "cursor-not-allowed bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
-                matches && !loading && "lofi-confirm-dialog-armed",
+                needsTyping && matches && !loading && "lofi-confirm-dialog-armed",
                 loading && "cursor-progress bg-rose-600 text-white opacity-90",
               )}
             >

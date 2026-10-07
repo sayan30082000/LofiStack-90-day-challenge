@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { CircleCheck } from "lucide-react";
-import { PricingTable, type Billing, type PricingPlan } from "@/components/ui/pricing-cards";
+import { PricingTable, type Billing, type PlanFinderDimension, type PricingPlan } from "@/components/ui/pricing-cards";
 import { cn } from "@/lib/utils";
 
 const PLANS: PricingPlan[] = [
@@ -54,6 +54,12 @@ const PLANS: PricingPlan[] = [
   },
 ];
 
+/** What buyers need. Limits match each plan's feature list. */
+const FINDER: PlanFinderDimension[] = [
+  { id: "seats", label: "Team size", unit: "seats", min: 1, max: 25, defaultValue: 1, format: (n) => (n === 1 ? "1 seat" : `${n} seats`), limits: { starter: 1, pro: 1, team: 10 } },
+  { id: "storage", label: "Asset storage", unit: "storage", min: 1, max: 600, step: 1, defaultValue: 5, format: (n) => `${n} GB`, limits: { starter: 1, pro: 50, team: 500 } },
+];
+
 export function PlansDemo() {
   const [picked, setPicked] = useState<{ id: string; billing: Billing } | null>(null);
   const plan = PLANS.find((p) => p.id === picked?.id);
@@ -62,6 +68,7 @@ export function PlansDemo() {
     <div className="flex w-full flex-col gap-6">
       <PricingTable
         plans={PLANS}
+        finder={FINDER}
         defaultBilling="monthly"
         yearlyDiscountLabel="Save 20%"
         onSelect={(id, billing) =>

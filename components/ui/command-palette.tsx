@@ -598,7 +598,7 @@ function PaletteDialog({
               </span>
             </>
           ) : (
-            <span className="grid size-10 shrink-0 place-items-center text-zinc-400 dark:text-zinc-500" aria-hidden>
+            <span className="grid size-10 shrink-0 place-items-center text-zinc-500 dark:text-zinc-400" aria-hidden>
               <Search className="size-4" />
             </span>
           )}
@@ -740,7 +740,7 @@ function PaletteDialog({
                           {isRunning ? (
                             <Loader2 className="size-4 shrink-0 text-indigo-600 motion-safe:animate-spin dark:text-indigo-400" aria-hidden />
                           ) : cmd.children ? (
-                            <ChevronRight className="size-4 shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden />
+                            <ChevronRight className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" aria-hidden />
                           ) : cmd.shortcut?.length ? (
                             <span className="hidden shrink-0 gap-1 sm:flex" aria-hidden>
                               {cmd.shortcut.map((k, i) => (
@@ -748,7 +748,7 @@ function PaletteDialog({
                               ))}
                             </span>
                           ) : isActive ? (
-                            <CornerDownLeft className="size-3.5 shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden />
+                            <CornerDownLeft className="size-3.5 shrink-0 text-zinc-500 dark:text-zinc-400" aria-hidden />
                           ) : null}
                         </div>
                       );

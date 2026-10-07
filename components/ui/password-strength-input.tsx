@@ -693,7 +693,7 @@ export function PasswordStrengthInput({
   const level = LEVELS[score];
 
   return (
-    <div className={cn("@container w-full text-sm", disabled && "opacity-70", className)}>
+    <div className={cn("@container w-full text-sm", className)}>
       <label htmlFor={id} className="block font-medium text-zinc-900 dark:text-zinc-100">
         {label}
         {required && (
@@ -766,7 +766,7 @@ export function PasswordStrengthInput({
           aria-valuemax={4}
           aria-valuenow={score}
           aria-valuetext={`${strengthText}${belowMin ? `. ${minStrengthText(strengthLabels[minStrength - 1])}` : ""}`}
-          className="relative grid flex-1 grid-cols-4 gap-1.5"
+          className={cn("relative grid flex-1 grid-cols-4 gap-1.5", disabled && "opacity-50")}
         >
           {[1, 2, 3, 4].map((seg) => (
             <span key={seg} className="relative h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">

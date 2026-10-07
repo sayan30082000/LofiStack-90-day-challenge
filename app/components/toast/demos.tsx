@@ -252,7 +252,7 @@ export function UndoDemo() {
       </div>
       {inbox.length === 0 ? (
         <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
-          <Inbox className="size-8 text-zinc-400 dark:text-zinc-500" aria-hidden />
+          <Inbox className="size-8 text-zinc-500 dark:text-zinc-400" aria-hidden />
           <p className="text-sm text-zinc-600 dark:text-zinc-400">Inbox zero. Nice.</p>
           <button type="button" className={btn} onClick={() => setArchived([])}>
             <RotateCcw className="size-4" aria-hidden /> Restore all
