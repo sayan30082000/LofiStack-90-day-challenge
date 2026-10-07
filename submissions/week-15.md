@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 15
 Type: card
 Component: KPI Stat Card
-Live: lofistack-90-day-challenge.vercel.app/components/kpi-card
+Live: lofistack-sayan.netlify.app/components/kpi-card
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/kpi-card.tsx
 Prompt:
 Build the "KPI Stat Card" component (#27, Type: card) for my LofiStack component gallery.
@@ -54,7 +54,7 @@ Rules:
 Week: 15
 Type: modal
 Component: Onboarding Tour
-Live: lofistack-90-day-challenge.vercel.app/components/product-tour
+Live: lofistack-sayan.netlify.app/components/product-tour
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/product-tour.tsx
 Prompt:
 Build the "Onboarding Tour" component (#36, Type: modal) for my LofiStack component gallery.

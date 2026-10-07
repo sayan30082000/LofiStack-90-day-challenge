@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 10
 Type: modal
 Component: Toast System
-Live: lofistack-90-day-challenge.vercel.app/components/toast
+Live: lofistack-sayan.netlify.app/components/toast
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/toast.tsx
 Prompt:
 Build the "Toast System" component (#35, Type: modal) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 10
 Type: navbar
 Component: Breadcrumbs
-Live: lofistack-90-day-challenge.vercel.app/components/breadcrumbs
+Live: lofistack-sayan.netlify.app/components/breadcrumbs
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/breadcrumbs.tsx
 Prompt:
 Build the "Breadcrumbs" component (#42, Type: navbar) for my LofiStack component gallery.

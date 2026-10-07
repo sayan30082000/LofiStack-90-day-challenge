@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 13
 Type: navbar
 Component: Mega Menu Navbar
-Live: lofistack-90-day-challenge.vercel.app/components/mega-menu-navbar
+Live: lofistack-sayan.netlify.app/components/mega-menu-navbar
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/mega-menu-navbar.tsx
 Prompt:
 Build the "Mega Menu Navbar" component (#38, Type: navbar) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 13
 Type: loader
 Component: Countdown Timer
-Live: lofistack-90-day-challenge.vercel.app/components/countdown-timer
+Live: lofistack-sayan.netlify.app/components/countdown-timer
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/countdown-timer.tsx
 Prompt:
 Build the "Countdown Timer" component (#55, Type: loader) for my LofiStack component gallery.

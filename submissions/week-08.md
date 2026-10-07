@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 08
 Type: form
 Component: Multi-Step Form Wizard
-Live: lofistack-90-day-challenge.vercel.app/components/multi-step-form
+Live: lofistack-sayan.netlify.app/components/multi-step-form
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/multi-step-form.tsx
 Prompt:
 Build the "Multi-Step Form Wizard" component (#17, Type: form) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 08
 Type: chart
 Component: Donut Chart
-Live: lofistack-90-day-challenge.vercel.app/components/donut-chart
+Live: lofistack-sayan.netlify.app/components/donut-chart
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/donut-chart.tsx
 Prompt:
 Build the "Donut Chart" component (#64, Type: chart) for my LofiStack component gallery.

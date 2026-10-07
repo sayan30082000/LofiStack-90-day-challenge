@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 11
 Type: table
 Component: Kanban Board
-Live: lofistack-90-day-challenge.vercel.app/components/kanban-board
+Live: lofistack-sayan.netlify.app/components/kanban-board
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/kanban-board.tsx
 Prompt:
 Build the "Kanban Board" component (#48, Type: table) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 11
 Type: chart
 Component: Gauge Chart
-Live: lofistack-90-day-challenge.vercel.app/components/gauge-chart
+Live: lofistack-sayan.netlify.app/components/gauge-chart
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/gauge-chart.tsx
 Prompt:
 Build the "Gauge Chart" component (#66, Type: chart) for my LofiStack component gallery.

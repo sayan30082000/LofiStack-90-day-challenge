@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 09
 Type: form
 Component: Newsletter Signup
-Live: lofistack-90-day-challenge.vercel.app/components/newsletter-signup
+Live: lofistack-sayan.netlify.app/components/newsletter-signup
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/newsletter-signup.tsx
 Prompt:
 Build the "Newsletter Signup" component (#19, Type: form) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 09
 Type: table
 Component: Data Table
-Live: lofistack-90-day-challenge.vercel.app/components/data-table
+Live: lofistack-sayan.netlify.app/components/data-table
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/data-table.tsx
 Prompt:
 Build the "Data Table" component (#46, Type: table) for my LofiStack component gallery.

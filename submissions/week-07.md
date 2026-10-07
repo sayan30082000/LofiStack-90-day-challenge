@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 07
 Type: modal
 Component: Command Palette
-Live: lofistack-90-day-challenge.vercel.app/components/command-palette
+Live: lofistack-sayan.netlify.app/components/command-palette
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/command-palette.tsx
 Prompt:
 Build the "Command Palette" component (#31, Type: modal) for my LofiStack component gallery.
@@ -56,7 +56,7 @@ Rules:
 Week: 07
 Type: section
 Component: Logo Marquee
-Live: lofistack-90-day-challenge.vercel.app/components/logo-marquee
+Live: lofistack-sayan.netlify.app/components/logo-marquee
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/logo-marquee.tsx
 Prompt:
 Build the "Logo Marquee" component (#60, Type: section) for my LofiStack component gallery.

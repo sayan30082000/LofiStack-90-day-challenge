@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 05
 Type: input
 Component: OTP Input
-Live: lofistack-90-day-challenge.vercel.app/components/otp-input
+Live: lofistack-sayan.netlify.app/components/otp-input
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/otp-input.tsx
 Prompt:
 Build the "OTP Input" component (#7, Type: input) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 05
 Type: chart
 Component: Activity Heatmap
-Live: lofistack-90-day-challenge.vercel.app/components/activity-heatmap
+Live: lofistack-sayan.netlify.app/components/activity-heatmap
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/activity-heatmap.tsx
 Prompt:
 Build the "Activity Heatmap" component (#63, Type: chart) for my LofiStack component gallery.

@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 06
 Type: form
 Component: File Dropzone
-Live: lofistack-90-day-challenge.vercel.app/components/file-dropzone
+Live: lofistack-sayan.netlify.app/components/file-dropzone
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/file-dropzone.tsx
 Prompt:
 Build the "File Dropzone" component (#18, Type: form) for my LofiStack component gallery.
@@ -54,7 +54,7 @@ Rules:
 Week: 06
 Type: card
 Component: 3D Tilt Card
-Live: lofistack-90-day-challenge.vercel.app/components/tilt-card
+Live: lofistack-sayan.netlify.app/components/tilt-card
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/tilt-card.tsx
 Prompt:
 Build the "3D Tilt Card" component (#24, Type: card) for my LofiStack component gallery.

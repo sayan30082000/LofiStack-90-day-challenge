@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 04
 Type: card
 Component: Pricing Cards
-Live: lofistack-90-day-challenge.vercel.app/components/pricing-cards
+Live: lofistack-sayan.netlify.app/components/pricing-cards
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/pricing-cards.tsx
 Prompt:
 Build the "Pricing Cards" component (#23, Type: card) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 04
 Type: modal
 Component: Type-to-Confirm Dialog
-Live: lofistack-90-day-challenge.vercel.app/components/confirm-dialog
+Live: lofistack-sayan.netlify.app/components/confirm-dialog
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/confirm-dialog.tsx
 Prompt:
 Build the "Type-to-Confirm Dialog" component (#32, Type: modal) for my LofiStack component gallery.

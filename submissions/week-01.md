@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 01
 Type: table
 Component: Tree View
-Live: lofistack-90-day-challenge.vercel.app/components/tree-view
+Live: lofistack-sayan.netlify.app/components/tree-view
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/tree-view.tsx
 Prompt:
 Build the "Tree View" component (#49, Type: table) for my LofiStack component gallery.
@@ -57,7 +57,7 @@ Rules:
 Week: 01
 Type: loader
 Component: Typing Indicator
-Live: lofistack-90-day-challenge.vercel.app/components/typing-indicator
+Live: lofistack-sayan.netlify.app/components/typing-indicator
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/typing-indicator/index.tsx
 Prompt:
 Build the "Typing Indicator" component (#54, Type: loader) for my LofiStack component gallery.

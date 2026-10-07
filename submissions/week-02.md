@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 02
 Type: input
 Component: Password Strength Input
-Live: lofistack-90-day-challenge.vercel.app/components/password-strength-input
+Live: lofistack-sayan.netlify.app/components/password-strength-input
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/password-strength-input.tsx
 Prompt:
 Build the "Password Strength Input" component (#9, Type: input) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 02
 Type: card
 Component: Flip Card
-Live: lofistack-90-day-challenge.vercel.app/components/flip-card
+Live: lofistack-sayan.netlify.app/components/flip-card
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/flip-card.tsx
 Prompt:
 Build the "Flip Card" component (#25, Type: card) for my LofiStack component gallery.

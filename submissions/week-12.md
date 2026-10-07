@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 12
 Type: input
 Component: Dual Range Slider
-Live: lofistack-90-day-challenge.vercel.app/components/range-slider
+Live: lofistack-sayan.netlify.app/components/range-slider
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/range-slider.tsx
 Prompt:
 Build the "Dual Range Slider" component (#10, Type: input) for my LofiStack component gallery.
@@ -55,7 +55,7 @@ Rules:
 Week: 12
 Type: section
 Component: Vertical Timeline
-Live: lofistack-90-day-challenge.vercel.app/components/timeline
+Live: lofistack-sayan.netlify.app/components/timeline
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/timeline.tsx
 Prompt:
 Build the "Vertical Timeline" component (#61, Type: section) for my LofiStack component gallery.

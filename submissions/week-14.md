@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 14
 Type: section
 Component: Before/After Slider
-Live: lofistack-90-day-challenge.vercel.app/components/before-after-slider
+Live: lofistack-sayan.netlify.app/components/before-after-slider
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/before-after-slider.tsx
 Prompt:
 Build the "Before/After Slider" component (#62, Type: section) for my LofiStack component gallery.
@@ -54,7 +54,7 @@ Rules:
 Week: 14
 Type: input
 Component: Date Range Picker
-Live: lofistack-90-day-challenge.vercel.app/components/date-range-picker
+Live: lofistack-sayan.netlify.app/components/date-range-picker
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/date-range-picker.tsx
 Prompt:
 Build the "Date Range Picker" component (#68, Type: input) for my LofiStack component gallery.

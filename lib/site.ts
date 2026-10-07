@@ -3,8 +3,8 @@ export const siteConfig = {
   ownerName: "Sayan Das",
   title: "Component Gallery",
   description: "Reusable React + Tailwind components built for the LofiStack 90 Day Build Challenge.",
-  /** Production URL without a trailing slash, e.g. https://yourname.vercel.app */
-  url: "https://lofistack-90-day-challenge.vercel.app",
+  /** Production URL without a trailing slash, e.g. https://yourname.netlify.app */
+  url: "https://lofistack-sayan.netlify.app",
   repoUrl: "https://github.com/sayan30082000/LofiStack-90-day-challenge",
   /** First day of the challenge (YYYY-MM-DD). Week 1 starts here. */
   challengeStart: "2026-10-01",

@@ -8,7 +8,7 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 Week: 03
 Type: navbar
 Component: Animated Tabs
-Live: lofistack-90-day-challenge.vercel.app/components/animated-tabs
+Live: lofistack-sayan.netlify.app/components/animated-tabs
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/animated-tabs.tsx
 Prompt:
 Build the "Animated Tabs" component (#40, Type: navbar) for my LofiStack component gallery.
@@ -54,7 +54,7 @@ Rules:
 Week: 03
 Type: loader
 Component: Skeleton Loader Kit
-Live: lofistack-90-day-challenge.vercel.app/components/skeleton
+Live: lofistack-sayan.netlify.app/components/skeleton
 Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/skeleton.tsx
 Prompt:
 Build the "Skeleton Loader Kit" component (#51, Type: loader) for my LofiStack component gallery.

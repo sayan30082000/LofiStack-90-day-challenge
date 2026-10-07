@@ -12,36 +12,36 @@ All 30 components of the 90 day plan, 2 per week.
 
 | Week | # | Name | Type | Live |
 |---|---|---|---|---|
-| 01 | 49 | Tree View | table | [/components/tree-view](https://lofistack-90-day-challenge.vercel.app/components/tree-view) |
-| 01 | 54 | Typing Indicator | loader | [/components/typing-indicator](https://lofistack-90-day-challenge.vercel.app/components/typing-indicator) |
-| 02 | 9 | Password Strength Input | input | [/components/password-strength-input](https://lofistack-90-day-challenge.vercel.app/components/password-strength-input) |
-| 02 | 25 | Flip Card | card | [/components/flip-card](https://lofistack-90-day-challenge.vercel.app/components/flip-card) |
-| 03 | 40 | Animated Tabs | navbar | [/components/animated-tabs](https://lofistack-90-day-challenge.vercel.app/components/animated-tabs) |
-| 03 | 51 | Skeleton Loader Kit | loader | [/components/skeleton](https://lofistack-90-day-challenge.vercel.app/components/skeleton) |
-| 04 | 23 | Pricing Cards | card | [/components/pricing-cards](https://lofistack-90-day-challenge.vercel.app/components/pricing-cards) |
-| 04 | 32 | Type-to-Confirm Dialog | modal | [/components/confirm-dialog](https://lofistack-90-day-challenge.vercel.app/components/confirm-dialog) |
-| 05 | 7 | OTP Input | input | [/components/otp-input](https://lofistack-90-day-challenge.vercel.app/components/otp-input) |
-| 05 | 63 | Activity Heatmap | chart | [/components/activity-heatmap](https://lofistack-90-day-challenge.vercel.app/components/activity-heatmap) |
-| 06 | 18 | File Dropzone | form | [/components/file-dropzone](https://lofistack-90-day-challenge.vercel.app/components/file-dropzone) |
-| 06 | 24 | 3D Tilt Card | card | [/components/tilt-card](https://lofistack-90-day-challenge.vercel.app/components/tilt-card) |
-| 07 | 31 | Command Palette | modal | [/components/command-palette](https://lofistack-90-day-challenge.vercel.app/components/command-palette) |
-| 07 | 60 | Logo Marquee | section | [/components/logo-marquee](https://lofistack-90-day-challenge.vercel.app/components/logo-marquee) |
-| 08 | 17 | Multi-Step Form Wizard | form | [/components/multi-step-form](https://lofistack-90-day-challenge.vercel.app/components/multi-step-form) |
-| 08 | 64 | Donut Chart | chart | [/components/donut-chart](https://lofistack-90-day-challenge.vercel.app/components/donut-chart) |
-| 09 | 19 | Newsletter Signup | form | [/components/newsletter-signup](https://lofistack-90-day-challenge.vercel.app/components/newsletter-signup) |
-| 09 | 46 | Data Table | table | [/components/data-table](https://lofistack-90-day-challenge.vercel.app/components/data-table) |
-| 10 | 35 | Toast System | modal | [/components/toast](https://lofistack-90-day-challenge.vercel.app/components/toast) |
-| 10 | 42 | Breadcrumbs | navbar | [/components/breadcrumbs](https://lofistack-90-day-challenge.vercel.app/components/breadcrumbs) |
-| 11 | 48 | Kanban Board | table | [/components/kanban-board](https://lofistack-90-day-challenge.vercel.app/components/kanban-board) |
-| 11 | 66 | Gauge Chart | chart | [/components/gauge-chart](https://lofistack-90-day-challenge.vercel.app/components/gauge-chart) |
-| 12 | 10 | Dual Range Slider | input | [/components/range-slider](https://lofistack-90-day-challenge.vercel.app/components/range-slider) |
-| 12 | 61 | Vertical Timeline | section | [/components/timeline](https://lofistack-90-day-challenge.vercel.app/components/timeline) |
-| 13 | 38 | Mega Menu Navbar | navbar | [/components/mega-menu-navbar](https://lofistack-90-day-challenge.vercel.app/components/mega-menu-navbar) |
-| 13 | 55 | Countdown Timer | loader | [/components/countdown-timer](https://lofistack-90-day-challenge.vercel.app/components/countdown-timer) |
-| 14 | 62 | Before/After Slider | section | [/components/before-after-slider](https://lofistack-90-day-challenge.vercel.app/components/before-after-slider) |
-| 14 | 68 | Date Range Picker | input | [/components/date-range-picker](https://lofistack-90-day-challenge.vercel.app/components/date-range-picker) |
-| 15 | 27 | KPI Stat Card | card | [/components/kpi-card](https://lofistack-90-day-challenge.vercel.app/components/kpi-card) |
-| 15 | 36 | Onboarding Tour | modal | [/components/product-tour](https://lofistack-90-day-challenge.vercel.app/components/product-tour) |
+| 01 | 49 | Tree View | table | [/components/tree-view](https://lofistack-sayan.netlify.app/components/tree-view) |
+| 01 | 54 | Typing Indicator | loader | [/components/typing-indicator](https://lofistack-sayan.netlify.app/components/typing-indicator) |
+| 02 | 9 | Password Strength Input | input | [/components/password-strength-input](https://lofistack-sayan.netlify.app/components/password-strength-input) |
+| 02 | 25 | Flip Card | card | [/components/flip-card](https://lofistack-sayan.netlify.app/components/flip-card) |
+| 03 | 40 | Animated Tabs | navbar | [/components/animated-tabs](https://lofistack-sayan.netlify.app/components/animated-tabs) |
+| 03 | 51 | Skeleton Loader Kit | loader | [/components/skeleton](https://lofistack-sayan.netlify.app/components/skeleton) |
+| 04 | 23 | Pricing Cards | card | [/components/pricing-cards](https://lofistack-sayan.netlify.app/components/pricing-cards) |
+| 04 | 32 | Type-to-Confirm Dialog | modal | [/components/confirm-dialog](https://lofistack-sayan.netlify.app/components/confirm-dialog) |
+| 05 | 7 | OTP Input | input | [/components/otp-input](https://lofistack-sayan.netlify.app/components/otp-input) |
+| 05 | 63 | Activity Heatmap | chart | [/components/activity-heatmap](https://lofistack-sayan.netlify.app/components/activity-heatmap) |
+| 06 | 18 | File Dropzone | form | [/components/file-dropzone](https://lofistack-sayan.netlify.app/components/file-dropzone) |
+| 06 | 24 | 3D Tilt Card | card | [/components/tilt-card](https://lofistack-sayan.netlify.app/components/tilt-card) |
+| 07 | 31 | Command Palette | modal | [/components/command-palette](https://lofistack-sayan.netlify.app/components/command-palette) |
+| 07 | 60 | Logo Marquee | section | [/components/logo-marquee](https://lofistack-sayan.netlify.app/components/logo-marquee) |
+| 08 | 17 | Multi-Step Form Wizard | form | [/components/multi-step-form](https://lofistack-sayan.netlify.app/components/multi-step-form) |
+| 08 | 64 | Donut Chart | chart | [/components/donut-chart](https://lofistack-sayan.netlify.app/components/donut-chart) |
+| 09 | 19 | Newsletter Signup | form | [/components/newsletter-signup](https://lofistack-sayan.netlify.app/components/newsletter-signup) |
+| 09 | 46 | Data Table | table | [/components/data-table](https://lofistack-sayan.netlify.app/components/data-table) |
+| 10 | 35 | Toast System | modal | [/components/toast](https://lofistack-sayan.netlify.app/components/toast) |
+| 10 | 42 | Breadcrumbs | navbar | [/components/breadcrumbs](https://lofistack-sayan.netlify.app/components/breadcrumbs) |
+| 11 | 48 | Kanban Board | table | [/components/kanban-board](https://lofistack-sayan.netlify.app/components/kanban-board) |
+| 11 | 66 | Gauge Chart | chart | [/components/gauge-chart](https://lofistack-sayan.netlify.app/components/gauge-chart) |
+| 12 | 10 | Dual Range Slider | input | [/components/range-slider](https://lofistack-sayan.netlify.app/components/range-slider) |
+| 12 | 61 | Vertical Timeline | section | [/components/timeline](https://lofistack-sayan.netlify.app/components/timeline) |
+| 13 | 38 | Mega Menu Navbar | navbar | [/components/mega-menu-navbar](https://lofistack-sayan.netlify.app/components/mega-menu-navbar) |
+| 13 | 55 | Countdown Timer | loader | [/components/countdown-timer](https://lofistack-sayan.netlify.app/components/countdown-timer) |
+| 14 | 62 | Before/After Slider | section | [/components/before-after-slider](https://lofistack-sayan.netlify.app/components/before-after-slider) |
+| 14 | 68 | Date Range Picker | input | [/components/date-range-picker](https://lofistack-sayan.netlify.app/components/date-range-picker) |
+| 15 | 27 | KPI Stat Card | card | [/components/kpi-card](https://lofistack-sayan.netlify.app/components/kpi-card) |
+| 15 | 36 | Onboarding Tour | modal | [/components/product-tour](https://lofistack-sayan.netlify.app/components/product-tour) |
 
 ## Run locally
 
@@ -77,13 +77,13 @@ submissions/                    ready-to-post lofidb submissions per week
 2. Build it: `components/ui/<slug>.tsx` plus `app/components/<slug>/page.tsx` (and `demos.tsx`) using `<ComponentPage slug="<slug>" ... />`.
 3. Add it to `lib/registry.ts` with its `codePath`, and raise `releasedThroughWeek` in `lib/site.ts` to this week. Components from later weeks stay hidden (404) until then. The homepage then shows the new Demo and Code links and marks them Live.
 4. Add the week's entry to `lib/agent-logs.ts`.
-5. Commit, tag it (`git tag week-02`) and push with tags. Vercel deploys on every push. Then copy the **lofidb posts** from the homepage dialogs or `submissions/week-XX.md`.
+5. Commit, tag it (`git tag week-02`) and push with tags. Netlify deploys on every push. Then copy the **lofidb posts** from the homepage dialogs or `submissions/week-XX.md`.
 
 To change the plan or a prompt, edit `prompts-data.js` in the parent folder and run `node build.js`; it regenerates `lib/prompts.generated.ts`.
 
 ## Before you deploy
 
-`lib/site.ts` holds your name, the Vercel URL and the GitHub repo URL. If the Vercel URL changes, update it there and in the table above, then run `node build.js` in the parent folder to refresh the submission posts.
+`lib/site.ts` holds your name, the Netlify URL and the GitHub repo URL. If the Netlify URL changes, update it there and in the table above, then run `node build.js` in the parent folder to refresh the submission posts.
 
 ## Deploy to Netlify
 
