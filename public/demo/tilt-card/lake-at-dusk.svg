@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e1b4b"/>
+      <stop offset="0.45" stop-color="#6d28d9"/>
+      <stop offset="0.75" stop-color="#f472b6"/>
+      <stop offset="1" stop-color="#fdba74"/>
+    </linearGradient>
+    <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fb923c" stop-opacity="0.85"/>
+      <stop offset="0.35" stop-color="#be185d"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff7ed"/>
+      <stop offset="0.6" stop-color="#fed7aa"/>
+      <stop offset="1" stop-color="#fdba74" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="380" fill="url(#sky)"/>
+  <g fill="#fff" opacity="0.8">
+    <circle cx="80" cy="60" r="1.6"/><circle cx="170" cy="110" r="1.1"/><circle cx="260" cy="40" r="1.4"/>
+    <circle cx="350" cy="90" r="1"/><circle cx="470" cy="50" r="1.5"/><circle cx="560" cy="120" r="1.1"/>
+    <circle cx="640" cy="70" r="1.7"/><circle cx="720" cy="30" r="1.2"/><circle cx="745" cy="130" r="1"/>
+    <circle cx="40" cy="150" r="1"/><circle cx="410" cy="150" r="0.9"/><circle cx="600" cy="20" r="1"/>
+  </g>
+  <circle cx="520" cy="330" r="120" fill="url(#sun)"/>
+  <circle cx="520" cy="330" r="58" fill="#fff7ed"/>
+  <path d="M0 300 L90 250 L170 290 L260 220 L360 300 L430 260 L520 320 L600 250 L700 300 L800 240 L800 380 L0 380 Z" fill="#4c1d95" opacity="0.75"/>
+  <path d="M0 340 L120 290 L220 340 L330 300 L450 350 L560 310 L680 350 L800 300 L800 380 L0 380 Z" fill="#2e1065"/>
+  <rect y="380" width="800" height="220" fill="url(#lake)"/>
+  <g fill="#fff7ed" opacity="0.7">
+    <rect x="470" y="392" width="100" height="4" rx="2"/>
+    <rect x="485" y="410" width="70" height="3" rx="1.5"/>
+    <rect x="495" y="428" width="50" height="3" rx="1.5"/>
+    <rect x="505" y="448" width="30" height="2" rx="1"/>
+    <rect x="512" y="468" width="16" height="2" rx="1"/>
+  </g>
+  <path d="M0 380 L120 400 L220 382 L330 398 L450 380 L560 396 L680 382 L800 398 L800 380 Z" fill="#2e1065" opacity="0.6"/>
+  <path d="M60 600 C 120 520, 180 520, 240 600 Z" fill="#1e1b4b" opacity="0.6"/>
+</svg>

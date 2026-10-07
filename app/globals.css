@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/*
+  Class-based dark mode. `.dark` turns dark styles on for a subtree and
+  `.light` turns them back off, so a component preview can force either
+  theme regardless of the page theme.
+*/
+@custom-variant dark (&:where(.dark, .dark *):not(:where(.light, .light *)));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  --animate-typing-fade: typing-fade 2s ease-in-out infinite;
+  --animate-typing-caret: typing-caret 1s steps(1) infinite;
+  --animate-tree-in: tree-in 160ms ease-out;
+
+  @keyframes typing-fade {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.9; }
+  }
+  @keyframes typing-caret {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  @keyframes tree-in {
+    from { opacity: 0; transform: translateY(-2px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+/* Typing indicator keyframes, used through inline animation styles so tempo can change per user. */
+@keyframes typing-key {
+  0%, 40%, 100% { transform: translateY(0); box-shadow: 0 2px 0 0 color-mix(in oklab, currentColor 45%, transparent); }
+  12%, 22% { transform: translateY(2px); box-shadow: 0 0 0 0 color-mix(in oklab, currentColor 45%, transparent); }
+}
+@keyframes typing-ink {
+  0% { stroke-dashoffset: 1; }
+  50%, 62% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -1; }
+}
+@keyframes typing-ghost {
+  0% { transform: scaleX(0); opacity: 0; }
+  14% { transform: scaleX(1); opacity: 1; }
+  78% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+@keyframes typing-unghost {
+  0%, 25% { transform: scaleX(1); opacity: 1; }
+  55% { transform: scaleX(0); opacity: 1; }
+  56%, 100% { transform: scaleX(0); opacity: 0; }
+}
+@keyframes typing-wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+@keyframes typing-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(260%); }
+}
+@keyframes typing-twinkle {
+  0%, 100% { transform: scale(0.85) rotate(0deg); opacity: 0.7; }
+  50% { transform: scale(1.1) rotate(18deg); opacity: 1; }
+}
+@keyframes typing-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+/* Shiki dual-theme output (defaultColor: false) */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+}
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+}
+.shiki {
+  background: transparent !important;
+}

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900">
+  <defs>
+    <linearGradient id="hd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a72b8"/><stop offset="1" stop-color="#1d3b72"/></linearGradient>
+    <linearGradient id="nav" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f4f4"/><stop offset="1" stop-color="#c9c9c9"/></linearGradient>
+    <pattern id="tile" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#d8dde6"/><path d="M0 16 L16 0" stroke="#c8ceda" stroke-width="2"/></pattern>
+  </defs>
+  <rect width="1440" height="900" fill="url(#tile)"/>
+  <rect x="120" y="0" width="1200" height="900" fill="#ffffff" stroke="#8a8a8a"/>
+  <rect x="120" y="0" width="1200" height="120" fill="url(#hd)"/>
+  <text x="160" y="78" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="bold" fill="#000" opacity="0.35">ACME Solutions Inc.</text>
+  <text x="157" y="75" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="bold" fill="#fff">ACME Solutions Inc.</text>
+  <text x="1080" y="70" font-family="Comic Sans MS, cursive" font-size="20" fill="#ffe066">Call now!</text>
+  <rect x="120" y="120" width="1200" height="44" fill="url(#nav)" stroke="#9a9a9a"/>
+  <g font-family="Verdana, sans-serif" font-size="17" fill="#0000ee" text-decoration="underline">
+    <text x="150" y="148">Home</text><text x="240" y="148">About Us</text><text x="360" y="148">Our Services</text>
+    <text x="510" y="148">Products</text><text x="620" y="148">Links</text><text x="700" y="148">Contact</text>
+  </g>
+  <rect x="140" y="184" width="1160" height="40" fill="#fff36b" stroke="#e0b800"/>
+  <text x="720" y="211" text-anchor="middle" font-family="Comic Sans MS, cursive" font-size="20" fill="#cc0000">*** NEW!!! Check out our SPECIAL OFFERS this month ***</text>
+  <rect x="140" y="244" width="240" height="560" fill="#eef1f7" stroke="#9aa6c0"/>
+  <rect x="140" y="244" width="240" height="34" fill="#1d3b72"/>
+  <text x="155" y="267" font-family="Verdana, sans-serif" font-size="16" font-weight="bold" fill="#fff">Quick Links</text>
+  <g font-family="Verdana, sans-serif" font-size="15" fill="#0000ee" text-decoration="underline">
+    <text x="160" y="310">» Downloads</text><text x="160" y="340">» Press Releases</text><text x="160" y="370">» FAQ</text>
+    <text x="160" y="400">» Guestbook</text><text x="160" y="430">» Site Map</text>
+  </g>
+  <rect x="160" y="470" width="200" height="120" fill="#ffffff" stroke="#9a9a9a"/>
+  <text x="260" y="520" text-anchor="middle" font-family="Verdana, sans-serif" font-size="14" fill="#555">Sign our</text>
+  <text x="260" y="545" text-anchor="middle" font-family="Verdana, sans-serif" font-size="14" font-weight="bold" fill="#c00">GUESTBOOK!</text>
+  <rect x="175" y="620" width="170" height="34" fill="#000"/>
+  <text x="260" y="643" text-anchor="middle" font-family="Courier New, monospace" font-size="18" fill="#3f3">Visitors: 004213</text>
+  <text x="400" y="290" font-family="Georgia, 'Times New Roman', serif" font-size="34" fill="#1d3b72">Welcome to our Website!</text>
+  <rect x="400" y="320" width="600" height="9" fill="#9a9a9a"/><rect x="400" y="342" width="600" height="9" fill="#9a9a9a"/><rect x="400" y="364" width="600" height="9" fill="#9a9a9a"/><rect x="400" y="386" width="600" height="9" fill="#9a9a9a"/><rect x="400" y="408" width="360" height="9" fill="#9a9a9a"/>
+  <rect x="1020" y="250" width="260" height="190" fill="#c7d2fe" stroke="#555" stroke-dasharray="6 4"/>
+  <text x="1150" y="352" text-anchor="middle" font-family="Verdana, sans-serif" font-size="16" fill="#334">[ photo.jpg ]</text>
+  <text x="400" y="470" font-family="Georgia, 'Times New Roman', serif" font-size="24" fill="#1d3b72">Our Services</text>
+  <rect x="400" y="495" width="860" height="9" fill="#9a9a9a"/><rect x="400" y="517" width="860" height="9" fill="#9a9a9a"/><rect x="400" y="539" width="860" height="9" fill="#9a9a9a"/><rect x="400" y="561" width="516" height="9" fill="#9a9a9a"/>
+  <rect x="400" y="600" width="270" height="44" rx="4" fill="#e0e0e0" stroke="#777"/>
+  <text x="535" y="628" text-anchor="middle" font-family="Verdana, sans-serif" font-size="16" fill="#000">Click Here &gt;&gt;</text>
+  <rect x="400" y="670" width="860" height="9" fill="#9a9a9a"/><rect x="400" y="692" width="860" height="9" fill="#9a9a9a"/><rect x="400" y="714" width="860" height="9" fill="#9a9a9a"/><rect x="400" y="736" width="516" height="9" fill="#9a9a9a"/>
+  <rect x="120" y="830" width="1200" height="70" fill="#d9d9d9"/>
+  <text x="720" y="872" text-anchor="middle" font-family="Verdana, sans-serif" font-size="14" fill="#444">© 2009 ACME Solutions Inc. · Best viewed in Internet Explorer at 1024x768</text>
+</svg>

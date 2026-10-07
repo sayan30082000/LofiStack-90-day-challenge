@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 175 32" width="175" height="32" role="img">
+  <g><path d="M4 6 H28 V26 H4 Z" fill="none" stroke="#e11d48" stroke-width="2.4"/><path d="M12 6 V26 M20 6 V26 M4 16 H28" stroke="#e11d48" stroke-width="2"/><rect x="12" y="6" width="8" height="10" fill="#e11d48"/></g>
+  <text x="42" y="22.5" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="0.3" textLength="129" lengthAdjust="spacingAndGlyphs" fill="#f4f4f5">Corvus Grid</text>
+</svg>

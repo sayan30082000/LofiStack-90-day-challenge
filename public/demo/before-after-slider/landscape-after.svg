@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="0.38" stop-color="#6d28d9"/><stop offset="0.7" stop-color="#f472b6"/><stop offset="1" stop-color="#fdba74"/></linearGradient>
+    <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f9a8d4"/><stop offset="0.35" stop-color="#7c3aed"/><stop offset="1" stop-color="#1e1b4b"/></linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fde68a" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#fde68a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="660" fill="url(#sky)"/>
+  <circle cx="1040" cy="420" r="340" fill="url(#glow)"/>
+  <circle cx="1040" cy="410" r="92" fill="#fef3c7"/>
+  <g fill="#fbcfe8" opacity="0.55">
+    <ellipse cx="330" cy="210" rx="190" ry="26"/><ellipse cx="420" cy="186" rx="120" ry="22"/>
+    <ellipse cx="1260" cy="300" rx="220" ry="20"/><ellipse cx="1180" cy="280" rx="110" ry="16"/>
+  </g>
+  <path fill="#7c3aed" opacity="0.75" d="M0 520 L140 430 L260 470 L420 330 L560 450 L700 380 L860 470 L980 400 L1120 480 L1280 360 L1430 450 L1600 400 L1600 660 L0 660 Z"/>
+  <path fill="#4c1d95" d="M0 580 L180 470 L320 540 L470 440 L640 560 L780 500 L940 590 L1100 520 L1250 590 L1400 500 L1600 570 L1600 660 L0 660 Z"/>
+  <path fill="#2e1065" d="M0 640 C200 590 360 610 520 630 C700 650 860 600 1040 620 C1220 640 1400 600 1600 630 L1600 680 L0 680 Z"/>
+  <rect y="660" width="1600" height="340" fill="url(#lake)"/>
+  <g fill="#fde68a" opacity="0.7">
+    <rect x="980" y="700" width="120" height="6" rx="3"/><rect x="950" y="740" width="180" height="5" rx="2.5"/>
+    <rect x="1000" y="785" width="90" height="4" rx="2"/><rect x="930" y="830" width="220" height="4" rx="2"/>
+    <rect x="990" y="880" width="110" height="3" rx="1.5"/>
+  </g>
+  <g fill="#140a2e"><path d="M60 400 L144 700 L-24.000000000000014 700 Z"/><path d="M130 320 L236.4 700 L23.599999999999994 700 Z"/><path d="M205 430 L280.6 700 L129.39999999999998 700 Z"/><path d="M270 360 L365.2 700 L174.8 700 Z"/><path d="M1420 440 L1492.8 700 L1347.2 700 Z"/><path d="M1490 370 L1582.4 700 L1397.6 700 Z"/><path d="M1560 410 L1641.2 700 L1478.8 700 Z"/><rect x="0" y="690" width="320" height="18"/><rect x="1380" y="690" width="220" height="18"/></g>
+  
+</svg>
