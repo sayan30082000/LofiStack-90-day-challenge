@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
+import { PROMPTS } from "@/lib/prompts.generated";
 import { getComponent } from "@/lib/registry";
 import { CodeBlock } from "./CodeBlock";
+import { CopyButton } from "./CopyButton";
 import { PreviewTabs } from "./PreviewTabs";
 
 export interface PropDoc {
@@ -38,6 +40,7 @@ interface ComponentPageProps {
 export function ComponentPage({ slug, examples, usage, props, types = [], accessibility = [] }: ComponentPageProps) {
   const entry = getComponent(slug);
   if (!entry) notFound();
+  const prompt = PROMPTS.find((p) => p.slug === slug)?.prompt;
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">
@@ -58,6 +61,14 @@ export function ComponentPage({ slug, examples, usage, props, types = [], access
         </div>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">{entry.name}</h1>
         <p className="mt-3 text-base text-zinc-600 sm:text-lg dark:text-zinc-400">{entry.description}</p>
+        {prompt && (
+          <a
+            href="#prompt"
+            className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-sm font-medium text-zinc-700 outline-none hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            <FileText className="size-4" aria-hidden /> Build prompt
+          </a>
+        )}
       </header>
 
       <div className="mt-10 flex flex-col gap-12">
@@ -77,6 +88,26 @@ export function ComponentPage({ slug, examples, usage, props, types = [], access
             />
           </section>
         ))}
+
+        {prompt && (
+          <section aria-labelledby="prompt" className="flex scroll-mt-20 flex-col gap-3">
+            <div>
+              <h2 id="prompt" className="scroll-mt-20 text-lg font-semibold tracking-tight">
+                Build prompt
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">The final prompt this component was built from.</p>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/60">
+              <div className="flex items-center justify-between gap-2 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+                <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">prompt</span>
+                <CopyButton value={prompt} label="Copy prompt" />
+              </div>
+              <pre className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words p-4 font-mono text-[13px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+                {prompt}
+              </pre>
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby="usage" className="flex flex-col gap-3">
           <h2 id="usage" className="text-lg font-semibold tracking-tight">
