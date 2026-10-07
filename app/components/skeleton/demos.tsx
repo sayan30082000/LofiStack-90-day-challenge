@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Heart, MessageCircle, RefreshCw, Repeat2 } from "lucide-react";
+import { Brain, Heart, MessageCircle, RefreshCw, Repeat2 } from "lucide-react";
 import {
   Skeleton,
   SkeletonCard,
@@ -11,6 +11,7 @@ import {
   SkeletonTableRow,
   SkeletonText,
   SkeletonWrapper,
+  forgetSkeletonLayout,
   type SkeletonAnimation,
 } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -158,6 +159,8 @@ export function FeedDemo() {
   const switchId = useId();
   const [loading, setLoading] = useState(true);
   const [animation, setAnimation] = useState<SkeletonAnimation>("shimmer");
+  const [blocks, setBlocks] = useState<number | null>(null);
+  const [run, setRun] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -215,9 +218,34 @@ export function FeedDemo() {
         </div>
       </div>
 
+      <p className="-mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-600 dark:text-zinc-400">
+        <span className="inline-flex items-center gap-1.5">
+          <Brain className="size-3.5" aria-hidden />
+          {blocks === null
+            ? "Turn loading off once: the real posts are measured and their shape is remembered."
+            : `Shape remembered: ${blocks} blocks. Refresh draws the real layout, even after a reload.`}
+        </span>
+        {blocks !== null && (
+          <button
+            type="button"
+            onClick={() => {
+              forgetSkeletonLayout("skeleton-demo-feed");
+              setBlocks(null);
+              setRun((n) => n + 1);
+            }}
+            className="rounded font-medium text-indigo-700 underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300"
+          >
+            Forget shape
+          </button>
+        )}
+      </p>
+
       <SkeletonWrapper
+        key={run}
         loading={loading}
         animation={animation}
+        rememberKey="skeleton-demo-feed"
+        onMeasure={(l) => setBlocks(l.blocks.length)}
         label="Loading posts"
         loadedText="3 posts loaded"
         fallback={

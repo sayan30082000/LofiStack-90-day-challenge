@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import {
   Bell,
   BookOpen,
@@ -25,6 +25,103 @@ const primary =
   "inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white outline-none hover:bg-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white active:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-600 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus-visible:ring-offset-zinc-900 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400";
 const secondary =
   "inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-sm font-medium outline-none hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-indigo-500 active:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800 dark:active:bg-zinc-700";
+
+/* ---------- Intent, prefetch and deep links ---------- */
+
+const PROJECT_TABS = [
+  { id: "overview", label: "Overview", icon: <Rocket />, body: "3 services healthy · last deploy 12 minutes ago · 99.98% uptime this month." },
+  { id: "activity", label: "Activity", icon: <History />, body: "Maya merged #482 · Leo opened #483 · Ines commented on the release notes." },
+  { id: "deploys", label: "Deploys", icon: <Download />, body: "Production ← main@a5b2884 · Preview ← feat/tabs@8165022 · 14 deploys this week." },
+  { id: "security", label: "Security", icon: <Shield />, body: "No open alerts · 2FA on for all 6 members · last audit passed on Oct 1." },
+];
+const FETCH_MS = 900;
+
+type Load = "loading" | "ready";
+
+export function IntentDemo() {
+  const [prefetch, setPrefetch] = useState(true);
+  const [cache, setCache] = useState<Record<string, Load>>({ overview: "ready" });
+  const [log, setLog] = useState<string[]>([]);
+  // Tabs already requested; a ref so a hover and a click never fetch the same tab twice.
+  const requested = useRef(new Set(["overview"]));
+
+  const load = (id: string, why: string) => {
+    if (requested.current.has(id)) return;
+    requested.current.add(id);
+    setCache((c) => ({ ...c, [id]: "loading" }));
+    setTimeout(() => {
+      setCache((c) => ({ ...c, [id]: "ready" }));
+      setLog((l) => [`${why} ${PROJECT_TABS.find((t) => t.id === id)?.label} (${FETCH_MS} ms)`, ...l].slice(0, 4));
+    }, FETCH_MS);
+  };
+
+  const tabs: AnimatedTab[] = PROJECT_TABS.map((t) => ({
+    id: t.id,
+    label: t.label,
+    icon: t.icon,
+    badge: cache[t.id] === "ready" ? "✓" : undefined,
+    badgeLabel: "loaded",
+    content: (
+      <div className={cn(card, "min-h-28 text-sm")}>
+        {cache[t.id] === "ready" ? (
+          <p className="leading-relaxed">{t.body}</p>
+        ) : (
+          <p role="status" className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+            <span className="size-4 rounded-full border-2 border-zinc-300 border-t-indigo-600 motion-safe:animate-spin dark:border-zinc-700 dark:border-t-indigo-400" aria-hidden />
+            Loading {t.label.toLowerCase()}…
+          </p>
+        )}
+      </div>
+    ),
+  }));
+
+  return (
+    <div className="flex w-full max-w-2xl flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <label className="inline-flex items-center gap-2 font-medium">
+          <input
+            type="checkbox"
+            checked={prefetch}
+            onChange={(e) => setPrefetch(e.target.checked)}
+            className="size-4 accent-indigo-600"
+          />
+          Prefetch on intent
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            requested.current = new Set(["overview"]);
+            setCache({ overview: "ready" });
+            setLog([]);
+          }}
+          className={secondary}
+        >
+          Clear cache
+        </button>
+      </div>
+      <AnimatedTabs
+        label="Project"
+        tabs={tabs}
+        hashSync="project-"
+        onIntent={prefetch ? (id) => load(id, "Prefetched:") : undefined}
+        intentOnce={false}
+        onChange={(id) => load(id, "Fetched when opened:")}
+      />
+      <div className="grid gap-2 text-xs text-zinc-600 sm:grid-cols-2 dark:text-zinc-400">
+        <ul aria-label="Network log" className="space-y-1 font-mono">
+          {log.length === 0 ? <li>Hover a tab and watch it load before you click.</li> : log.map((l, i) => <li key={i}>{l}</li>)}
+        </ul>
+        <p>
+          The open tab lives in the URL. Try{" "}
+          <a href="#project-deploys" className="font-medium text-indigo-700 underline underline-offset-2 dark:text-indigo-300">
+            #project-deploys
+          </a>{" "}
+          or share the address bar.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- Account settings ---------- */
 

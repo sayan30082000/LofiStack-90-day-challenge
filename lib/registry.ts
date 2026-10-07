@@ -80,7 +80,8 @@ const allComponents: RegistryEntry[] = [
     name: "Animated Tabs",
     type: "navbar",
     week: 3,
-    description: "Tabs with a sliding indicator, badges and vertical mode.",
+    description:
+      "Tabs that act on intent: the indicator leans toward the tab you're about to pick, panels can prefetch before the click, and the open tab lives in the URL so shared links and reloads restore it. WAI-ARIA keyboard support, badges, pill and vertical modes.",
     addedAt: "2026-10-02",
     codePath: "animated-tabs.tsx",
   },
@@ -90,7 +91,8 @@ const allComponents: RegistryEntry[] = [
     name: "Skeleton Loader Kit",
     type: "loader",
     week: 3,
-    description: "Skeleton primitives and presets for loading states.",
+    description:
+      "Skeletons that remember the real shape: after content loads once, every text line, image and button is measured and the next load draws that exact layout, so nothing jumps. Plus primitives, presets, a page-wide shimmer and a gentle 'still loading' message.",
     addedAt: "2026-10-02",
     codePath: "skeleton.tsx",
   },

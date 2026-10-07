@@ -5,7 +5,7 @@ import { FeedDemo, PresetsDemo, PrimitivesDemo } from "./demos";
 export const metadata: Metadata = {
   title: "Skeleton Loader Kit",
   description:
-    "Skeleton, SkeletonText and SkeletonCircle primitives with a page-synchronised shimmer, pulse or no animation, four presets and a wrapper that fades content in.",
+    "Skeletons that remember the real shape: after content loads once, every text line, image and button is measured, and the next load draws that exact layout. Plus primitives, presets, a page-synchronised shimmer and a 'still loading' message.",
 };
 
 const feedCode = `
@@ -16,6 +16,10 @@ const [loading, setLoading] = useState(true);
   animation="shimmer"          // default for every skeleton inside the fallback
   label="Loading posts"
   loadedText="3 posts loaded"
+  // Shape memory: after the first load the real layout is measured and saved,
+  // and every later load draws that exact shape instead of the fallback
+  rememberKey="home-feed"
+  slowAfter={4000}             // "Still loading… thanks for waiting." after 4s
   fallback={posts.map((p) => <PostSkeleton key={p.id} image={p.image} />)}
 >
   {posts.map((p) => <PostView key={p.id} post={p} />)}
@@ -77,7 +81,7 @@ export default function Page() {
         {
           title: "Loading feed",
           description:
-            "Toggle a feed of 3 posts between loading and loaded, or hit Refresh to fake a 1.8s fetch. The skeletons mirror the real posts, so nothing shifts, and the posts fade in when they arrive.",
+            "The first load uses a hand-made skeleton. Turn loading off once and the real posts are measured: every text line, avatar, image, button and card outline. Refresh again and the skeleton is the exact shape of your content, even after a page reload.",
           preview: <FeedDemo />,
           code: feedCode,
           minHeight: 640,
@@ -134,7 +138,20 @@ export default function Page() {
             { name: "loadedText", type: "string", default: '"Content loaded"', description: "Announced politely when loading ends. Pass \"\" to stay silent." },
             { name: "animation", type: animationType, description: "Default animation for every skeleton in the fallback." },
             { name: "fadeDuration", type: "number", default: "400", description: "Fade-in duration of the children in ms." },
+            { name: "rememberKey", type: "string", description: "Turns on shape memory. After each load the real content is measured (text lines via Range.getClientRects, media and controls as blocks, round painted elements as circles, bordered surfaces as outlines) and saved under this key; later loads draw that shape instead of the fallback." },
+            { name: "persistShape", type: "boolean", default: "true", description: "Also keep remembered shapes in localStorage, so they survive a reload. Read only after hydration." },
+            { name: "onMeasure", type: "(layout: SkeletonLayout) => void", description: "Called with each new measurement." },
+            { name: "slowAfter", type: "number | null", default: "4000", description: "After this many ms of loading, show and announce slowText. null turns it off." },
+            { name: "slowText", type: "string", default: '"Still loading… thanks for waiting."', description: "Message for slow loads." },
             { name: "className", type: "string", description: "Classes for the container (both states)." },
+          ],
+        },
+        {
+          name: "Shape memory helpers",
+          props: [
+            { name: "measureSkeletonLayout(el, options?)", type: "(HTMLElement, { maxBlocks?, minSize? }) => SkeletonLayout", default: "160, 3", description: "Measures any element's visible shape. x and w are stored as fractions of the width, so the shape survives resizes." },
+            { name: "<SkeletonFromLayout layout />", type: "{ layout, animation?, className? }", description: "Draws a measured layout as positioned skeleton blocks." },
+            { name: "forgetSkeletonLayout(key)", type: "(key: string) => void", description: "Forgets a remembered shape, e.g. after a redesign." },
           ],
         },
         {
@@ -152,6 +169,8 @@ export default function Page() {
         "While loading, the wrapper is a role=\"status\" container with aria-busy=\"true\" and aria-label \"Loading content\" (configurable), so it is announced as busy rather than read shape by shape.",
         "Every skeleton shape and preset is aria-hidden; only the label is exposed.",
         "When loading ends, aria-busy turns false and a polite live region says \"Content loaded\" (configurable, or silent).",
+        "A slow load adds \"Still loading… thanks for waiting.\" inside the role=\"status\" container, so screen reader users hear it once too.",
+        "Remembered shapes are aria-hidden like every other skeleton; only the label is exposed.",
         "With prefers-reduced-motion, shimmer and pulse stop and the shapes are static; the content appears without the fade.",
         "Skeleton colors are zinc-200 on light and zinc-800 on dark, visible against cards in both themes.",
       ]}

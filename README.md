@@ -43,6 +43,11 @@ All 30 components of the 90 day plan, 2 per week.
 | 15 | 27 | KPI Stat Card | card | [/components/kpi-card](https://lofistack-sayan.netlify.app/components/kpi-card) |
 | 15 | 36 | Onboarding Tour | modal | [/components/product-tour](https://lofistack-sayan.netlify.app/components/product-tour) |
 
+## Docs and tests
+
+- **Docs:** [docs/](docs/README.md) has one page per released component, generated from the TypeScript props (types, defaults, JSDoc) by `npm run docs`.
+- **Tests:** `npm test` runs the Vitest + Testing Library suite in `tests/`.
+
 ## Run locally
 
 ```bash
@@ -76,7 +81,7 @@ submissions/                    ready-to-post lofidb submissions per week
 1. Open the homepage, find this week, and copy each component's **Prompt**.
 2. Build it: `components/ui/<slug>.tsx` plus `app/components/<slug>/page.tsx` (and `demos.tsx`) using `<ComponentPage slug="<slug>" ... />`.
 3. Add it to `lib/registry.ts` with its `codePath`, and raise `releasedThroughWeek` in `lib/site.ts` to this week. Components from later weeks stay hidden (404) until then. The homepage then shows the new Demo and Code links and marks them Live.
-4. Add the week's entry to `lib/agent-logs.ts`.
+4. Add the week's entry to `lib/agent-logs.ts`, then run `npm test` and `npm run docs`.
 5. Commit, tag it (`git tag week-02`) and push with tags. Netlify deploys on every push. Then copy the **lofidb posts** from the homepage dialogs or `submissions/week-XX.md`.
 
 To change the plan or a prompt, edit `prompts-data.js` in the parent folder and run `node build.js`; it regenerates `lib/prompts.generated.ts`.

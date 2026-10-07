@@ -7,6 +7,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
@@ -55,10 +56,36 @@ export interface AnimatedTabsProps {
   keepMounted?: boolean;
   /** Shown when tabs is empty. */
   emptyText?: string;
+  /**
+   * How far (0 to 1) the indicator stretches toward a tab the mouse is over, previewing the move.
+   * 0 turns it off. Ignored with reduced motion.
+   */
+  magnet?: number;
+  /**
+   * Called when someone is about to open a tab: the mouse rests on it for intentDelay ms,
+   * keyboard focus lands on it, or a finger touches it. Use it to prefetch the panel's data.
+   */
+  onIntent?: (id: string) => void;
+  /** Hover time before onIntent fires, in ms. */
+  intentDelay?: number;
+  /** Fire onIntent only the first time for each tab. */
+  intentOnce?: boolean;
+  /**
+   * Keeps the selected tab in the URL hash (#billing), so links open a tab and the back button
+   * or a shared link restores it. Pass a string to prefix the hash, e.g. "settings-".
+   */
+  hashSync?: boolean | string;
   className?: string;
   listClassName?: string;
   panelClassName?: string;
 }
+
+const noop = () => () => {};
+const subscribeHash = (cb: () => void) => {
+  window.addEventListener("hashchange", cb);
+  return () => window.removeEventListener("hashchange", cb);
+};
+const readHash = () => decodeURIComponent(window.location.hash.slice(1));
 
 const STYLES = `
 @media (prefers-reduced-motion: no-preference) {
@@ -91,6 +118,11 @@ export function AnimatedTabs({
   fullWidth = false,
   keepMounted = true,
   emptyText = "Nothing to show yet.",
+  magnet = 0.3,
+  onIntent,
+  intentDelay = 80,
+  intentOnce = true,
+  hashSync = false,
   className,
   listClassName,
   panelClassName,
@@ -98,9 +130,18 @@ export function AnimatedTabs({
   const base = useId();
   const vertical = orientation === "vertical";
   const pill = variant === "pill";
+  const hashPrefix = typeof hashSync === "string" ? hashSync : "";
+
+  // The URL hash, read on the client only so server and client markup match.
+  const hash = useSyncExternalStore(hashSync !== false ? subscribeHash : noop, () => (hashSync !== false ? readHash() : ""), () => "");
+  const hashTab =
+    hashSync !== false && hash.startsWith(hashPrefix)
+      ? tabs.find((t) => t.id === hash.slice(hashPrefix.length) && !t.disabled)?.id
+      : undefined;
 
   const [inner, setInner] = useState(defaultValue);
-  const requested = value ?? inner;
+  // A tab named in the URL wins over the remembered choice, so shared links open the right tab.
+  const requested = value ?? hashTab ?? inner;
   const activeIndex = (() => {
     const i = tabs.findIndex((t) => t.id === requested && !t.disabled);
     return i >= 0 ? i : tabs.findIndex((t) => !t.disabled);
@@ -123,13 +164,51 @@ export function AnimatedTabs({
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
   const lastRect = useRef<{ start: number; end: number } | null>(null);
 
+  // The last id reported through onChange, so a hash we wrote ourselves isn't reported twice.
+  const reported = useRef<string | undefined>(undefined);
+
   const select = useCallback(
     (id: string) => {
       if (value === undefined) setInner(id);
+      reported.current = id;
+      if (hashSync !== false) {
+        // replaceState keeps the back button for real navigation; React re-reads the hash on the next render.
+        window.history.replaceState(window.history.state, "", `#${encodeURIComponent(hashPrefix + id)}`);
+      }
       if (id !== activeId) onChange?.(id);
     },
-    [value, activeId, onChange],
+    [value, activeId, onChange, hashSync, hashPrefix],
   );
+
+  // Tabs opened from the URL (on load, a link, back/forward) are reported like a click, once.
+  useEffect(() => {
+    if (!hashTab || hashTab === reported.current) return;
+    reported.current = hashTab;
+    onChange?.(hashTab);
+  }, [hashTab, onChange]);
+
+  /* ---------- Intent ---------- */
+
+  const intentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intended = useRef(new Set<string>());
+  const fireIntent = useCallback(
+    (id: string) => {
+      if (!onIntent || (intentOnce && intended.current.has(id))) return;
+      intended.current.add(id);
+      onIntent(id);
+    },
+    [onIntent, intentOnce],
+  );
+  const cancelIntent = () => {
+    if (intentTimer.current) clearTimeout(intentTimer.current);
+    intentTimer.current = null;
+  };
+  useEffect(() => cancelIntent, []);
+
+  /* ---------- Indicator ---------- */
+
+  // The tab under the mouse, which the indicator leans toward.
+  const hoverId = useRef<string | null>(null);
 
   /** Moves the indicator onto the active tab. The leading edge travels faster than the trailing one. */
   const place = useCallback(
@@ -143,17 +222,26 @@ export function AnimatedTabs({
         lastRect.current = null;
         return;
       }
-      const start = vertical ? tab.offsetTop : tab.offsetLeft;
-      const size = vertical ? tab.offsetHeight : tab.offsetWidth;
       const total = vertical ? list.clientHeight : list.clientWidth;
-      const end = total - start - size;
+      const span = (el: HTMLElement) => {
+        const s = vertical ? el.offsetTop : el.offsetLeft;
+        return { start: s, end: total - s - (vertical ? el.offsetHeight : el.offsetWidth) };
+      };
+      let { start, end } = span(tab);
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const hovered = hoverId.current && hoverId.current !== activeId ? tabRefs.current.get(hoverId.current) : undefined;
+      if (hovered && magnet > 0 && !reduceMotion) {
+        // Stretch only the far edge toward the hovered tab, like a magnet pulling it.
+        const h = span(hovered);
+        if (h.start > start) end = Math.round(end - (end - h.end) * magnet);
+        else start = Math.round(start - (start - h.start) * magnet);
+      }
       const [a, b] = vertical ? (["top", "bottom"] as const) : (["left", "right"] as const);
 
       const prev = lastRect.current;
       // Nothing moved: leave any running transition alone.
       if (prev && prev.start === start && prev.end === end) return;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (!animate || reduce || !prev) {
+      if (!animate || reduceMotion || !prev) {
         ind.style.transition = "none";
       } else {
         const forward = start > prev.start;
@@ -166,7 +254,7 @@ export function AnimatedTabs({
       ind.style.opacity = "1";
       lastRect.current = { start, end };
     },
-    [activeId, vertical],
+    [activeId, vertical, magnet],
   );
 
   const updateFades = useCallback(() => {
@@ -250,6 +338,10 @@ export function AnimatedTabs({
       role="tablist"
       aria-label={label}
       aria-orientation={orientation}
+      onPointerLeave={() => {
+        hoverId.current = null;
+        place(true);
+      }}
       className={cn(
         "relative flex",
         vertical ? "flex-col" : "w-max min-w-full",
@@ -296,6 +388,16 @@ export function AnimatedTabs({
             disabled={t.disabled}
             onClick={() => select(t.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
+            onFocus={() => !t.disabled && fireIntent(t.id)}
+            onPointerEnter={(e) => {
+              if (t.disabled) return;
+              if (e.pointerType !== "mouse") return fireIntent(t.id);
+              hoverId.current = t.id;
+              place(true);
+              cancelIntent();
+              intentTimer.current = setTimeout(() => fireIntent(t.id), intentDelay);
+            }}
+            onPointerLeave={cancelIntent}
             className={cn(
               "group/tab relative z-10 inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium outline-none transition-colors duration-200 motion-reduce:transition-none",
               "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-45",

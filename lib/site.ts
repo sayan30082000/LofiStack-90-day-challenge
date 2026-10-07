@@ -14,5 +14,5 @@ export const siteConfig = {
    * Components from weeks after this one stay hidden (their pages 404) even though the code is built.
    * Raise it by 1 each week before you post that week's components.
    */
-  releasedThroughWeek: 2,
+  releasedThroughWeek: 3,
 };

@@ -50,6 +50,16 @@ export const agentLogs: AgentLog[] = [
       "53 tests in 4 files, all passing (npm test). While writing them it caught a real bug: the crack-time estimate rated \"hello world\" at 48 years and \"correct horse battery staple\" at millions of years because it ignored dictionary words. It now rates them 1 second and centuries, and l33t passwords like Tr0ub4dor&3 as instant. It also fixed a dependency conflict (@types/node 20 to 22, matching Netlify's Node 22). Saved about half a day.",
     automated: true,
   },
+  {
+    week: 3,
+    task: "Generate component documentation automatically from the TypeScript source",
+    agent: "Claude Code",
+    workflow:
+      "Asked Claude Code for docs that can't go stale: a script that reads each released component with the TypeScript compiler API, turns every exported Props/Options interface into a table (name, type, default from the function signature, JSDoc description), lists the real exports for the import line, and links the live demo, source and build prompt. Wired it to npm run docs and linked the result from the README.",
+    result:
+      "docs/ now has a page for each of the 6 released components, 195 props documented, regenerated in about a second with npm run docs. Its first draft built the import line from interface names and invented two exports that don't exist (TypingActivity, MeasureSkeleton); checking the output caught it and it now reads the real exports. Saved about 3 hours of hand-written docs, and every future week is documented for free.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -74,7 +84,7 @@ Add an "npm test" script, run the tests, fix any real bug you find in the compon
   {
     week: 3,
     kind: "Documentation",
-    task: "Generate a docs section for every component in the README",
+    task: "Generate component documentation automatically from the TypeScript source",
     agent: "Claude",
     prompt: `Read every file in components/ui/ and write a README section per component: one-line purpose, an install/import line, a minimal usage example, and a props table (name, type, default, description) taken from the TypeScript interface. Keep each section under 25 lines and order them by challenge week.`,
   },
