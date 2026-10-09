@@ -1,5 +1,7 @@
 # Component Gallery
 
+## Live Link: https://lofistack-sayan.netlify.app
+
 Reusable React + Tailwind components built for the LofiStack 90 Day Build Challenge.
 
 The homepage is the whole challenge on one page: 15 weeks grouped into the 3 monthly reviews, each week with its 2 components (live demo, GitHub code link, build prompt and a ready lofidb post) and its agent log. Every component also has its own page with live previews, code, a props table and accessibility notes.
