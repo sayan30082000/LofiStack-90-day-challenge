@@ -13,7 +13,7 @@ export type ComponentType =
   | "input";
 
 export interface RegistryEntry {
-  /** Number from the 70-idea prompt library. */
+  /** Number from the prompt library. */
   number: number;
   slug: string;
   name: string;
@@ -53,26 +53,26 @@ const allComponents: RegistryEntry[] = [
     codePath: "tree-view.tsx",
   },
   {
-    number: 9,
-    slug: "password-strength-input",
-    name: "Password Strength Input",
+    number: 71,
+    slug: "bangla-phonetic-input",
+    name: "Bangla Phonetic Input",
     type: "input",
     week: 2,
     description:
-      "A password field that explains itself: how long the password would take to crack in plain words, the single change that would help most, and a one-click memorable passphrase that already passes your rules. Plus a strength meter, rules checklist and confirm field.",
-    addedAt: "2026-10-02",
-    codePath: "password-strength-input.tsx",
+      "Type Bangla with English letters, Avro-style: ami tomake bhalobashi becomes আমি তোমাকে ভালোবাসি as you type, with a suggestion bar, a dictionary of common words, paste-to-convert and Ctrl+M to switch language.",
+    addedAt: "2026-10-11",
+    codePath: "bangla-phonetic-input/index.tsx",
   },
   {
-    number: 25,
-    slug: "flip-card",
-    name: "Flip Card",
+    number: 72,
+    slug: "ticket-card",
+    name: "Tear-off Ticket Card",
     type: "card",
     week: 2,
     description:
-      "A flip card that behaves like a real card: it turns away from wherever you press, leans toward your cursor to show which way it will go, and lets you press and hold to peek at the back. Keyboard, hover and reduced-motion friendly.",
-    addedAt: "2026-10-02",
-    codePath: "flip-card.tsx",
+      "A ticket whose stub tears off along a perforated edge when you drag it, like real paper, with a real scannable Code 39 barcode, an Add to calendar (.ics) button and a stamped used state.",
+    addedAt: "2026-10-11",
+    codePath: "ticket-card.tsx",
   },
   {
     number: 40,

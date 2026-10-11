@@ -3,11 +3,11 @@ import axe from "axe-core";
 import type { ComponentType } from "react";
 import { describe, expect, it } from "vitest";
 import * as animatedTabs from "@/app/components/animated-tabs/demos";
+import * as banglaInput from "@/app/components/bangla-phonetic-input/demos";
 import * as confirmDialog from "@/app/components/confirm-dialog/demos";
-import * as flipCard from "@/app/components/flip-card/demos";
-import * as passwordStrength from "@/app/components/password-strength-input/demos";
 import * as pricingCards from "@/app/components/pricing-cards/demos";
 import * as skeleton from "@/app/components/skeleton/demos";
+import * as ticketCard from "@/app/components/ticket-card/demos";
 import * as treeView from "@/app/components/tree-view/demos";
 import * as typingIndicator from "@/app/components/typing-indicator/demos";
 
@@ -19,8 +19,8 @@ import * as typingIndicator from "@/app/components/typing-indicator/demos";
 const PAGES: Record<string, Record<string, unknown>> = {
   "tree-view": treeView,
   "typing-indicator": typingIndicator,
-  "password-strength-input": passwordStrength,
-  "flip-card": flipCard,
+  "bangla-phonetic-input": banglaInput,
+  "ticket-card": ticketCard,
   "animated-tabs": animatedTabs,
   skeleton,
   "pricing-cards": pricingCards,

@@ -7,35 +7,34 @@ Post each block as its own message in lofidb. Links come from lib/site.ts; run `
 ````text
 Week: 02
 Type: input
-Component: Password Strength Input
-Live: lofistack-sayan.netlify.app/components/password-strength-input
-Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/password-strength-input.tsx
+Component: Bangla Phonetic Input
+Live: lofistack-sayan.netlify.app/components/bangla-phonetic-input
+Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/bangla-phonetic-input/index.tsx
 Prompt:
-Build the "Password Strength Input" component (#9, Type: input) for my LofiStack component gallery.
-Route: /components/password-strength-input
+Build the "Bangla Phonetic Input" component (#71, Type: input) for my LofiStack component gallery.
+Route: /components/bangla-phonetic-input
 
 What it does:
-- A password field that explains WHY a password is weak and HOW to fix it, not just a coloured bar.
-- Crack time in plain words ("About 3 hours to crack", "centuries") from a pure, exported estimateCrackTime(): leaked passwords are instant, dictionary words (also l33t-spelled like Tr0ub4dor) count as one guess each, long glued runs count as several words, separators between words are cheap, and only the rest is brute-forced over its character pool; runs like abc/123/aaa count as one character. guessesPerSecond defaults to 1e10 (fast offline attack). Export formatCrackTime(log10Seconds) too.
-- Best fix: a pure bestPasswordTip() tries +4 characters / an uppercase letter / a number / a symbol on a copy and shows the one with the biggest gain and its new crack time ("Best fix: add 4 more characters (centuries to crack)"); leaked passwords and abc/123/aaa runs get their own tips first; nothing once it takes centuries.
-- Suggest a passphrase: generatePassphrase() picks 5 words from a built-in ~550-word list with random digit/symbol separators and random capitals using crypto.getRandomValues with rejection sampling (never Math.random), retries until it passes the field's rules and minStrength, and reports its real entropy in bits. The suggestion card shows the passphrase, "About N to crack, even if the attacker knows how it was made", Use it (fills password + confirm, switches to visible so it can be saved) and Another. Once used, the crack time line uses the passphrase's real entropy so the two numbers agree.
-- Everything a good password field needs too: show/hide toggle, 4-segment meter (Weak / Fair / Good / Strong) from a pure scorePassword() (length, classes, repeats, sequences, a common-password list that also catches trailing digits and l33t), a minimum-strength notch, a rules checklist, an optional confirm field with match / no match, and a Caps Lock warning.
+- An input that turns phonetic English into Bangla as you type, the way Avro Phonetic does: "ami tomake bhalobashi" becomes "আমি তোমাকে ভালোবাসি". No Bangla keyboard needed.
+- Pure, exported transliterate(roman): longest-match, case-sensitive Avro rules (t ত / T ট, d দ / D ড, n ন / N ণ, sh শ / S ষ, r র / R ড়, o inherent / O ো, i ি / I ী, u ু / U ূ, rri ৃ), vowels as kar after a consonant and full letters elsewhere, a list of real conjuncts (ন্ধ ক্ত স্ত ক্ষ…), ra-phala after most consonants (প্র গ্র) but not ম (আমরা), y → য-ফলা after a consonant and য় elsewhere, w → ব-ফলা, ng → ং or ঙ before a vowel (বাংলা, বাঙালি), rr → reph, ^ → ঁ, digits → ০–৯.
+- Pure suggestBangla(roman, dictionary): dictionary words first (DEFAULT_BANGLA_DICTIONARY, about 230 everyday words and loanwords: তোমাকে, ভালোবাসি, ঢাকা, ধন্যবাদ…), then the rule reading, then variants (final ো, স/শ swap, reph). transliterateText(text) converts a paragraph and turns full stops into দাঁড়ি (।).
+- The field converts each word when you type a space, newline or punctuation after it. A suggestion bar under it shows the current word's candidates plus the English original; ↑ ↓ pick, Enter takes one, Esc keeps English, clicking takes one without losing focus. Ctrl+M or a toggle switches Bangla / English. Pasting English in Bangla mode converts it. A dictionary prop adds your own words (brand names, people). Works with phone keyboards (no keydown dependence: it reads what changed), autocorrect off.
 
-Props (export an interface named PasswordStrengthInputProps):
-label, value? / defaultValue, onChange(value, result), rules?, showChecklist, minStrength, confirm, confirmValue? / onConfirmChange, error?, disabled, required, description, scoreOptions, strengthLabels, showCrackTime, guessesPerSecond, crackTimeText, showTips, tipText, suggestPassphrase, passphraseOptions, suggestText, useSuggestionText, anotherSuggestionText, suggestionStrengthText, suggestionUsedText and every other visible string
+Props (export an interface named BanglaPhoneticInputProps):
+label, value? / defaultValue, onChange(value), defaultBangla, onModeChange, multiline, rows, dictionary?: Record<string, string | string[]>, maxSuggestions, convertPaste, onCommit(bangla, roman), placeholder, hint, name, id, disabled, required, banglaLabel, englishLabel, toggleLabel, suggestionsLabel, keepEnglishLabel
 
 Accessibility:
-Toggle has aria-pressed and label "Show password"; meter uses role=meter with aria-valuetext; checklist is a real list with met/missing screen reader text; strength and crack time are announced after typing pauses (debounced live region); filling a suggestion is announced; tips and buttons are real text and buttons with 40px targets.
+Single-line field is a WAI-ARIA combobox (aria-expanded, aria-controls, aria-activedescendant) with a listbox of suggestions; the top suggestion is announced politely after typing pauses; lang="bn" in Bangla mode so screen readers switch voice; the toggle has aria-pressed and aria-keyshortcuts="Control+M"; 40px suggestion targets.
 
 Demo page shows:
-1) A sign-up form with confirm field, crack time, best fix and Suggest a passphrase. 2) A stricter admin policy (12+ characters, no spaces, 2 numbers, Strong minimum) where suggestions still pass. 3) A compact version with no checklist, tips or suggestions, plus a disabled state.
+1) A chat reply box in Bangla with a converted-word count. 2) A form whose dictionary prop adds brand words (lofistack → লফিস্ট্যাক). 3) A paragraph converter using transliterateText with a Copy button.
 
 Project context: this goes into my existing LofiStack gallery (Next.js App Router + TypeScript + Tailwind CSS v4, lucide-react icons, cn() helper in lib/utils.ts, shared <ComponentPage> layout in components/gallery/ComponentPage.tsx, registry in lib/registry.ts).
 
 Deliver:
-1. components/ui/password-strength-input.tsx (split into a folder components/ui/password-strength-input/ if it needs helpers or data). Export the component and its props interface. Add "use client" only where needed.
-2. app/components/password-strength-input/page.tsx: demo page using <ComponentPage> with the live previews below, a usage code snippet and a props table.
-3. The new entry for lib/registry.ts (slug "password-strength-input", type "input").
+1. components/ui/bangla-phonetic-input.tsx (split into a folder components/ui/bangla-phonetic-input/ if it needs helpers or data). Export the component and its props interface. Add "use client" only where needed.
+2. app/components/bangla-phonetic-input/page.tsx: demo page using <ComponentPage> with the live previews below, a usage code snippet and a props table.
+3. The new entry for lib/registry.ts (slug "bangla-phonetic-input", type "input").
 
 Rules:
 - TypeScript interfaces for every prop, with short JSDoc comments. No `any`.
@@ -54,35 +53,35 @@ Rules:
 ````text
 Week: 02
 Type: card
-Component: Flip Card
-Live: lofistack-sayan.netlify.app/components/flip-card
-Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/flip-card.tsx
+Component: Tear-off Ticket Card
+Live: lofistack-sayan.netlify.app/components/ticket-card
+Repo: github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/ticket-card.tsx
 Prompt:
-Build the "Flip Card" component (#25, Type: card) for my LofiStack component gallery.
-Route: /components/flip-card
+Build the "Tear-off Ticket Card" component (#72, Type: card) for my LofiStack component gallery.
+Route: /components/ticket-card
 
 What it does:
-- A flip card that behaves like a real card, not just a 180° spin.
-- Turns away from where you press: in direction="auto" (default) pressing near the left/right edge turns it sideways and near the top/bottom turns it up or down; in every mode the pressed edge goes away from the viewer (rotateY + for the right edge, rotateX − for the bottom edge) and the card returns the way it came. Keep both rotateX() and rotateY() in the transform at all times so CSS interpolates each angle on its own, and pre-rotate the back face on the same axis.
-- Lean preview (tiltHint): while a mouse hovers the front, the card leans up to tiltAngle (7°) toward the side it would turn, strongest at the edges, with a quick 180ms transition and no lean right after a flip.
-- Hold to peek (peekOnHold): press and hold the surface for peekDelay (350ms) to show the other side; letting go turns it back, the release never counts as a flip, and onPeek(peeking) reports it. A shorter press is a normal click.
-- Still a complete flip card: click (and Enter/Space on the corner button) or hover trigger, controlled flipped + onFlip, both faces in one grid cell so the card is as tall as its taller face, interactive content on the back never flips it, text selection never flips it, touch taps toggle hover cards, and a short dip animation while turning.
+- A ticket card (concert, boarding pass, cinema) whose stub tears off along a perforated edge like real paper.
+- Drag the stub away from the main part: it follows the pointer, rotating from the far corner so the perforation opens; past tearThreshold (half its size) it rips free on release with a short flying animation and a light vibration; earlier, it springs back. Pointer capture, touch-action none, drags starting on buttons or links ignored. A 40px scissors button tears it from the keyboard. onTear fires once; tornContent shows where the stub was (e.g. "Checked in 7:42 PM").
+- Layout: stub on the right, or at the bottom when the ticket is narrower than 520px (orientation auto | horizontal | vertical). Notches at the perforation are cut with CSS masks so any background shows through, a dashed perforation line, drop shadow on the masked shape.
+- TicketBarcode: a real, scannable Code 39 barcode as SVG (0-9, A-Z, space, - .), built from Code 39's structure (10 bar patterns × 4 wide-space positions) instead of a typed table, quiet zones, dark bars on white in both themes. AddToCalendar + pure ticketToIcs(event): an .ics file with UTC times, escaped text and CRLF line ends.
+- A used state stamps the ticket and locks the stub.
 
-Props (export an interface named FlipCardProps):
-front, back, trigger: 'click' | 'hover', direction: 'auto' | 'horizontal' | 'vertical', flipped? / defaultFlipped / onFlip, label, showControl, controlPosition, controlIcon, flipOnSurfaceClick, tiltHint, tiltAngle, peekOnHold, peekDelay, onPeek, duration, perspective, disabled, className, faceClassName, frontClassName, backClassName, controlClassName
+Props (export an interface named TicketCardProps):
+label, main, stub, orientation, stubSize, torn? / defaultTorn, onTear, tearThreshold, used, usedLabel, tornContent, tearLabel, tornText, notch, className, paperClassName, mainClassName, stubClassName. TicketBarcode: value, height, showValue. AddToCalendar: event { title, start, end, location?, description?, uid? }, label, fileName
 
 Accessibility:
-Flip control is a real button with aria-pressed and a specific label; the hidden face gets aria-hidden and inert (also during a peek); pressing, leaning and peeking are pointer extras while keyboard users get the same content through the button; reduced motion replaces the rotation and lean with a crossfade.
+The ticket is an article named by label; dragging always has the scissors-button alternative; tearing and the used state are announced in a polite live region; the barcode is role=img named "Barcode …"; reduced motion skips the flying animation; text on coloured paper stays above 4.5:1.
 
 Demo page shows:
-1) A postcard that shows the physical behaviour (press any edge, hover to see the lean, hold to peek) with a flips/peeking readout. 2) A 3-card vocabulary flashcard deck with Next/Previous and Got it / Still learning on the back. 3) A hover team-member card. 4) A vertical ticket flip.
+1) A concert ticket on a purple gradient with gate/row/seat, Add to calendar and a check-in stub with a barcode; a New ticket button resets it. 2) A vertical boarding pass DAC → CXB with a barcode stub you drag down. 3) A used cinema ticket.
 
 Project context: this goes into my existing LofiStack gallery (Next.js App Router + TypeScript + Tailwind CSS v4, lucide-react icons, cn() helper in lib/utils.ts, shared <ComponentPage> layout in components/gallery/ComponentPage.tsx, registry in lib/registry.ts).
 
 Deliver:
-1. components/ui/flip-card.tsx (split into a folder components/ui/flip-card/ if it needs helpers or data). Export the component and its props interface. Add "use client" only where needed.
-2. app/components/flip-card/page.tsx: demo page using <ComponentPage> with the live previews below, a usage code snippet and a props table.
-3. The new entry for lib/registry.ts (slug "flip-card", type "card").
+1. components/ui/ticket-card.tsx (split into a folder components/ui/ticket-card/ if it needs helpers or data). Export the component and its props interface. Add "use client" only where needed.
+2. app/components/ticket-card/page.tsx: demo page using <ComponentPage> with the live previews below, a usage code snippet and a props table.
+3. The new entry for lib/registry.ts (slug "ticket-card", type "card").
 
 Rules:
 - TypeScript interfaces for every prop, with short JSDoc comments. No `any`.

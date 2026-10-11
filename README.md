@@ -74,7 +74,7 @@ lib/
   registry.ts                   built components (feeds the homepage and sitemap)
   agent-logs.ts                 Track B: one agent log per week
   challenge.ts                  weeks, months and lofidb post builders
-  prompts.generated.ts          all 70 build prompts + the 15-week plan (generated)
+  prompts.generated.ts          every build prompt + the 15-week plan (generated)
   site.ts                       your name, site URL and repo URL
 submissions/                    ready-to-post lofidb submissions per week
 ```

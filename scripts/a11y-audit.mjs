@@ -39,8 +39,11 @@ const STATES = {
   "/components/pricing-cards": [
     { label: "finder: nothing fits", run: (p) => p.locator('input[type="range"]').first().fill("25") },
   ],
-  "/components/password-strength-input": [
-    { label: "passphrase suggestion", run: (p) => p.getByRole("button", { name: "Suggest a passphrase" }).first().click() },
+  "/components/bangla-phonetic-input": [
+    { label: "suggestions open", run: (p) => p.getByRole("textbox", { name: "Reply in Bangla" }).pressSequentially("valo achi tumi") },
+  ],
+  "/components/ticket-card": [
+    { label: "stub torn off", run: (p) => p.getByRole("button", { name: "Tear off stub" }).first().click() },
   ],
   "/components/tree-view": [
     { label: "changes only", run: (p) => p.getByRole("button", { name: /^Changes/ }).first().click() },

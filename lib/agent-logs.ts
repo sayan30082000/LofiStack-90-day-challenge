@@ -42,12 +42,12 @@ export const agentLogs: AgentLog[] = [
   },
   {
     week: 2,
-    task: "Add a unit test suite for the Week 1 and Week 2 components",
+    task: "Add a unit test suite for my components",
     agent: "Claude Code",
     workflow:
       "Asked Claude Code to add Vitest + Testing Library and write unit tests for the password scorer, crack-time estimate, best-fix tip and passphrase generator, the Flip Card's press direction and hold-to-peek, the Tree View's change tracking, and the typing hook's \"changed their mind\" state. Run them, fix real bugs, and explain every failure.",
     result:
-      "53 tests in 4 files, all passing (npm test). While writing them it caught a real bug: the crack-time estimate rated \"hello world\" at 48 years and \"correct horse battery staple\" at millions of years because it ignored dictionary words. It now rates them 1 second and centuries, and l33t passwords like Tr0ub4dor&3 as instant. It also fixed a dependency conflict (@types/node 20 to 22, matching Netlify's Node 22). Saved about half a day.",
+      "53 tests in 4 files, all passing (npm test). While writing them it caught a real bug: the crack-time estimate rated \"hello world\" at 48 years and \"correct horse battery staple\" at millions of years because it ignored dictionary words. It now rates them 1 second and centuries, and l33t passwords like Tr0ub4dor&3 as instant. It also fixed a dependency conflict (@types/node 20 to 22, matching Netlify's Node 22). When Week 2 was swapped for the Bangla Phonetic Input and Tear-off Ticket Card, the suite grew to cover them too (Avro rules, conversion, Code 39, .ics, tearing): 156 tests, all passing. Saved about half a day.",
     automated: true,
   },
   {
