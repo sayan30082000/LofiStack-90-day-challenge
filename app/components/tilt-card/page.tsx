@@ -1,11 +1,25 @@
 import type { Metadata } from "next";
 import { ComponentPage } from "@/components/gallery/ComponentPage";
-import { GameCoverDemo, ImageCardDemo, MembershipDemo } from "./demos";
+import { GameCoverDemo, ImageCardDemo, LightDemo, MembershipDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "3D Tilt Card",
-  description: "Card that tilts in 3D toward the pointer with a moving glare, parallax depth layers and a drifting shadow.",
+  description:
+    "A 3D tilt card lit by a real, fixed light: the shine slides across it as it tilts and the shadow falls away from the lamp. On phones you tilt the phone itself. Plus parallax depth layers.",
 };
+
+const lightCode = `
+<TiltCard
+  light={{ x: -0.6, y: -0.7 }}   // a lamp at the top left; "pointer" makes the glare follow the cursor
+  motion                         // phones: tilt the phone (iOS asks once via "Enable motion")
+  className="aspect-[5/7] rounded-2xl bg-slate-900 p-5 text-white"
+>
+  <p data-depth="20">Collector · 01/30</p>
+  <div data-depth="45">🌊</div>
+</TiltCard>
+
+lightFor(rx, ry, maxTilt, light);              // glare % and shadow px for a fixed light
+orientationToTilt(reading, base, maxTilt);     // card rotation from DeviceOrientation`;
 
 const membershipCode = `
 <TiltCard
@@ -76,6 +90,14 @@ export default function Page() {
       slug="tilt-card"
       examples={[
         {
+          title: "A fixed light, and phone tilt",
+          description:
+            "Move the light with the sliders, then tilt the card: the reflection slides the opposite way and the shadow falls away from the light, like a real card under a lamp. Open it on a phone and tilt the phone.",
+          preview: <LightDemo />,
+          code: lightCode,
+          minHeight: 460,
+        },
+        {
           title: "Membership card",
           description:
             "Name, number, chip and wordmark sit on separate data-depth layers, so they lift off the card while you hover. Press to push it down.",
@@ -110,9 +132,13 @@ export default function Page() {
         { name: "resetDuration", type: "number", default: "600", description: "Ease back to rest after the pointer leaves, in ms." },
         { name: "disabled", type: "boolean", default: "false", description: "Flat card with no tilt, glare or lift." },
         { name: "className", type: "string", description: "Classes for the tilting surface. Don't add overflow-hidden here; clip each layer instead." },
+        { name: "light", type: '"pointer" | { x: number; y: number }', default: '"pointer"', description: "pointer: the glare follows the cursor. A point from -1 to 1 is a fixed lamp: the reflection moves opposite to the tilt and the shadow falls away from it; the resting card shows a soft shine." },
+        { name: "motion", type: "boolean", default: "true", description: "On touch devices, tilt follows DeviceOrientation, calibrated to the first reading and again after the screen rotates. Off with reduced motion." },
+        { name: "motionLabel", type: "string", default: '"Enable motion"', description: "Label of the button iOS needs before it shares motion." },
         { name: "wrapperClassName", type: "string", description: "Classes for the untransformed outer wrapper, e.g. width." },
       ]}
       accessibility={[
+        "Phone tilt never starts on its own on iOS: a real button asks for permission. With prefers-reduced-motion, motion stays off.",
         "The motion is decorative: no roles or labels are added, and children keep their own semantics and tab order.",
         "Keyboard users get feedback through focus-within: the card lifts a few pixels and depth layers rise halfway.",
         "Touch input never tilts the card, so scrolling past it on a phone is unaffected.",

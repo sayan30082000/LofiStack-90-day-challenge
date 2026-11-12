@@ -3,8 +3,10 @@
 import {
   useEffect,
   useId,
+  useImperativeHandle,
   useRef,
   useState,
+  type Ref,
   type ChangeEvent,
   type DragEvent,
   type KeyboardEvent,
@@ -12,6 +14,7 @@ import {
 } from "react";
 import {
   Ban,
+  CircleCheck,
   CloudUpload,
   File as FileIcon,
   FileArchive,
@@ -21,6 +24,8 @@ import {
   FileSpreadsheet,
   FileText,
   FileVideo,
+  Loader2,
+  MapPin,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -66,7 +71,13 @@ export interface FileDropzoneMessages {
   usage: (count: number, maxFiles: number, totalSize: string) => string;
 }
 
+/** Lets a parent add files without a drop or the picker, e.g. from a paste handler or samples. */
+export interface FileDropzoneHandle {
+  addFiles: (files: File[]) => void;
+}
+
 export interface FileDropzoneProps {
+  ref?: Ref<FileDropzoneHandle>;
   /** Accepted types: MIME types ("image/png"), wildcards ("image/*") or extensions (".pdf"). Empty accepts anything. */
   accept?: string[];
   /** Maximum size per file, in bytes. Unlimited when omitted. */
@@ -89,6 +100,14 @@ export interface FileDropzoneProps {
   formatSize?: (bytes: number) => string;
   /** Override any user-facing string. */
   messages?: Partial<FileDropzoneMessages>;
+  /**
+   * Checks each file before upload and offers one-click fixes: GPS location in photos (remove it),
+   * blurry or too-small images, oversized images (shrink), CSVs missing required columns.
+   * false turns every check off.
+   */
+  preflight?: PreflightOptions | false;
+  /** Wording of the checks and fixes. */
+  preflightMessages?: Partial<PreflightMessages>;
   /** Classes for the outer wrapper. */
   className?: string;
 }
@@ -98,6 +117,9 @@ interface Entry {
   file: File;
   /** Object URL for image previews. */
   url?: string;
+  checking?: boolean;
+  fixing?: boolean;
+  issues?: PreflightIssue[];
 }
 
 interface Rejection {
@@ -204,6 +226,214 @@ function extensionLabel(file: File) {
 
 const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
 
+/* ---------- Pre-flight checks (pure where possible) ---------- */
+
+/**
+ * True when a JPEG carries GPS coordinates in its EXIF data, i.e. it reveals where the photo
+ * was taken. Reads the APP1 "Exif" segment and looks for a non-empty GPS IFD (tag 0x8825).
+ */
+export function jpegHasGps(bytes: Uint8Array): boolean {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return false;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let i = 2;
+  while (i + 4 <= bytes.length && bytes[i] === 0xff) {
+    const marker = bytes[i + 1];
+    if (marker === 0xda) break; // start of image data: no more metadata
+    const size = view.getUint16(i + 2);
+    const isExif =
+      marker === 0xe1 && i + 10 <= bytes.length && String.fromCharCode(...bytes.subarray(i + 4, i + 8)) === "Exif";
+    if (isExif) {
+      const tiff = i + 10;
+      if (tiff + 8 > bytes.length) return false;
+      const little = bytes[tiff] === 0x49;
+      const u16 = (o: number) => (o + 2 <= bytes.length ? view.getUint16(o, little) : 0);
+      const u32 = (o: number) => (o + 4 <= bytes.length ? view.getUint32(o, little) : 0);
+      const ifd0 = tiff + u32(tiff + 4);
+      const entries = u16(ifd0);
+      for (let k = 0; k < entries; k++) {
+        const e = ifd0 + 2 + k * 12;
+        if (u16(e) === 0x8825) return u16(tiff + u32(e + 8)) > 0;
+      }
+      return false;
+    }
+    i += 2 + size;
+  }
+  return false;
+}
+
+/**
+ * Sharpness as the variance of the Laplacian over a greyscale image (0–255 per pixel).
+ * Sharp photos score in the hundreds; out-of-focus ones score low.
+ */
+export function sharpness(gray: ArrayLike<number>, width: number, height: number): number {
+  let sum = 0;
+  let sumSq = 0;
+  let n = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      const lap = gray[i - width] + gray[i + width] + gray[i - 1] + gray[i + 1] - 4 * gray[i];
+      sum += lap;
+      sumSq += lap * lap;
+      n++;
+    }
+  }
+  if (!n) return 0;
+  const mean = sum / n;
+  return sumSq / n - mean * mean;
+}
+
+/** Header columns of a CSV (quotes respected), which required ones are missing, and how many rows are empty. */
+export function checkCsv(text: string, required: string[] = []) {
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/);
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  const header = (lines[0] ?? "").match(/("([^"]|"")*"|[^,]*)(,|$)/g) ?? [];
+  const columns = header
+    .map((c) => c.replace(/,$/, "").replace(/^"|"$/g, "").replace(/""/g, '"').trim())
+    .filter((c, i, all) => c || i < all.length - 1);
+  const norm = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
+  const have = new Set(columns.map(norm));
+  const body = lines.slice(1);
+  return {
+    columns,
+    missing: required.filter((r) => !have.has(norm(r))),
+    rows: body.filter((l) => l.replace(/[,\s"]/g, "")).length,
+    emptyRows: body.filter((l) => !l.replace(/[,\s"]/g, "")).length,
+  };
+}
+
+export interface PreflightOptions {
+  /** Warn when a JPEG contains GPS location, with a one-click fix. */
+  location?: boolean;
+  /** Flag images whose sharpness score is below this. false turns it off. */
+  blurThreshold?: number | false;
+  /** Smallest acceptable image size in px. */
+  minWidth?: number;
+  minHeight?: number;
+  /** Offer to shrink images bigger than this many bytes. */
+  shrinkAbove?: number;
+  /** Longest side after shrinking, in px. */
+  shrinkTo?: number;
+  /** Columns a CSV must have (case, spaces, dashes and underscores ignored). */
+  csvColumns?: string[];
+}
+
+export type PreflightIssueId = "location" | "blurry" | "small" | "large" | "csv-missing" | "csv-empty";
+
+export interface PreflightIssue {
+  id: PreflightIssueId;
+  text: string;
+  /** One-click fix offered for this issue. */
+  fix?: "strip" | "shrink";
+}
+
+export interface PreflightMessages {
+  checking: string;
+  location: string;
+  blurry: string;
+  small: (w: number, h: number, minW: number, minH: number) => string;
+  large: (size: string) => string;
+  csvMissing: (columns: string[]) => string;
+  csvEmpty: (n: number) => string;
+  strip: string;
+  shrink: string;
+  fixing: string;
+  stripped: (name: string) => string;
+  shrunk: (name: string, from: string, to: string) => string;
+  allGood: string;
+}
+
+export const DEFAULT_PREFLIGHT_MESSAGES: PreflightMessages = {
+  checking: "Checking…",
+  location: "Contains GPS location (where it was taken)",
+  blurry: "Looks blurry",
+  small: (w, h, mw, mh) => `Only ${w} × ${h} px (needs ${mw} × ${mh})`,
+  large: (size) => `Large image (${size})`,
+  csvMissing: (cols) => `Missing column${cols.length === 1 ? "" : "s"}: ${cols.join(", ")}`,
+  csvEmpty: (n) => `${n} empty row${n === 1 ? "" : "s"}`,
+  strip: "Remove location",
+  shrink: "Shrink",
+  fixing: "Fixing…",
+  stripped: (name) => `Location removed from ${name}.`,
+  shrunk: (name, from, to) => `${name} shrunk from ${from} to ${to}.`,
+  allGood: "Looks good",
+};
+
+async function loadBitmap(file: File) {
+  return createImageBitmap(file);
+}
+
+/** Re-encodes an image through a canvas. Drops every bit of metadata (GPS included), optionally resizing. */
+export async function reencodeImage(file: File, maxSide = Infinity, quality = 0.9): Promise<File> {
+  const bmp = await loadBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bmp.width * scale));
+  canvas.height = Math.max(1, Math.round(bmp.height * scale));
+  canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close?.();
+  const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not encode image"))), type, quality),
+  );
+  return new File([blob], file.name, { type, lastModified: Date.now() });
+}
+
+/** Runs every check that applies to the file. Never throws: a check that can't run is skipped. */
+export async function analyzeFile(
+  file: File,
+  options: PreflightOptions,
+  m: PreflightMessages,
+  formatSize: (n: number) => string,
+): Promise<PreflightIssue[]> {
+  const issues: PreflightIssue[] = [];
+  const isImage = file.type.startsWith("image/");
+  try {
+    if (options.location !== false && (file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name))) {
+      // EXIF sits in the first 128 KB.
+      const head = new Uint8Array(await file.slice(0, 128 * 1024).arrayBuffer());
+      if (jpegHasGps(head)) issues.push({ id: "location", text: m.location, fix: "strip" });
+    }
+    if (isImage && typeof createImageBitmap === "function") {
+      const bmp = await loadBitmap(file);
+      const { width, height } = bmp;
+      if ((options.minWidth && width < options.minWidth) || (options.minHeight && height < options.minHeight)) {
+        issues.push({ id: "small", text: m.small(width, height, options.minWidth ?? 0, options.minHeight ?? 0) });
+      }
+      const threshold = options.blurThreshold ?? 25;
+      if (threshold !== false && width >= 64 && height >= 64) {
+        // Measure at most 512 px wide, so phone photos don't take long.
+        const scale = Math.min(1, 512 / Math.max(width, height));
+        const w = Math.round(width * scale);
+        const h = Math.round(height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(bmp, 0, 0, w, h);
+          const px = ctx.getImageData(0, 0, w, h).data;
+          const gray = new Float32Array(w * h);
+          for (let i = 0; i < w * h; i++) gray[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+          if (sharpness(gray, w, h) < threshold) issues.push({ id: "blurry", text: m.blurry });
+        }
+      }
+      bmp.close?.();
+      if (options.shrinkAbove !== undefined && file.size > options.shrinkAbove) {
+        issues.push({ id: "large", text: m.large(formatSize(file.size)), fix: "shrink" });
+      }
+    }
+    if (options.csvColumns && (file.type === "text/csv" || /\.csv$/i.test(file.name))) {
+      const result = checkCsv(await file.text(), options.csvColumns);
+      if (result.missing.length) issues.push({ id: "csv-missing", text: m.csvMissing(result.missing) });
+      if (result.emptyRows) issues.push({ id: "csv-empty", text: m.csvEmpty(result.emptyRows) });
+    }
+  } catch {
+    // Unreadable file: no checks, the upload still works.
+  }
+  return issues;
+}
+
 const STYLES = `
 @keyframes lofi-file-dropzone-ants { to { stroke-dashoffset: -28; } }
 @keyframes lofi-file-dropzone-shake {
@@ -230,6 +460,7 @@ const STYLES = `
  * image thumbnails and a removable file list.
  */
 export function FileDropzone({
+  ref,
   accept = [],
   maxSize,
   maxFiles,
@@ -241,9 +472,12 @@ export function FileDropzone({
   name,
   formatSize = formatBytes,
   messages: messagesProp,
+  preflight = {},
+  preflightMessages,
   className,
 }: FileDropzoneProps) {
   const m = { ...DEFAULT_MESSAGES, ...messagesProp };
+  const pm = { ...DEFAULT_PREFLIGHT_MESSAGES, ...preflightMessages };
   const uid = useId();
   const inputId = `${uid}-input`;
   const labelId = `${uid}-label`;
@@ -263,7 +497,45 @@ export function FileDropzone({
   const nextId = useRef(1);
   const urls = useRef(new Set<string>());
 
+  const entriesRef = useRef(entries);
+  useEffect(() => {
+    entriesRef.current = entries;
+  });
   const limit = multiple ? (maxFiles ?? Infinity) : 1;
+
+  /** Runs the pre-flight checks for one entry and stores the result, unless the file changed meanwhile. */
+  const runChecks = (entry: Entry) => {
+    if (preflight === false) return;
+    void analyzeFile(entry.file, preflight, pm, formatSize).then((issues) =>
+      setEntries((list) => list.map((e) => (e.id === entry.id && e.file === entry.file ? { ...e, checking: false, issues } : e))),
+    );
+  };
+
+  const applyFix = async (entry: Entry, issue: PreflightIssue) => {
+    if (disabled || !issue.fix) return;
+    setEntries((list) => list.map((e) => (e.id === entry.id ? { ...e, fixing: true } : e)));
+    try {
+      const fixed =
+        issue.fix === "shrink"
+          ? await reencodeImage(entry.file, (preflight || {}).shrinkTo ?? 2000, 0.82)
+          : await reencodeImage(entry.file, Infinity, 0.92);
+      revoke(entry);
+      const url = URL.createObjectURL(fixed);
+      urls.current.add(url);
+      const updated: Entry = { id: entry.id, file: fixed, url, checking: true };
+      const next = entriesRef.current.map((e) => (e.id === entry.id ? updated : e));
+      setThumbs((t) => {
+        const copy = { ...t };
+        delete copy[entry.id];
+        return copy;
+      });
+      commit(next);
+      announce(issue.fix === "shrink" ? pm.shrunk(fixed.name, formatSize(entry.file.size), formatSize(fixed.size)) : pm.stripped(fixed.name));
+      runChecks(updated);
+    } catch {
+      setEntries((list) => list.map((e) => (e.id === entry.id ? { ...e, fixing: false } : e)));
+    }
+  };
   const mimeRules = accept.filter((r) => !r.trim().startsWith("."));
 
   // Revoke every preview URL still alive when the component unmounts.
@@ -307,7 +579,8 @@ export function FileDropzone({
         rejected.push({ id: nextId.current++, name: file.name, reason });
         continue;
       }
-      const entry: Entry = { id: nextId.current++, file };
+      const checkable = file.type.startsWith("image/") || /.csv$/i.test(file.name) || file.type === "text/csv";
+      const entry: Entry = { id: nextId.current++, file, checking: preflight !== false && checkable };
       if (file.type.startsWith("image/")) {
         entry.url = URL.createObjectURL(file);
         urls.current.add(entry.url);
@@ -326,8 +599,11 @@ export function FileDropzone({
     if (accepted.length) {
       commit([...kept, ...accepted]);
       announce(m.added(accepted.length));
+      accepted.filter((e) => e.checking).forEach(runChecks);
     }
   };
+
+  useImperativeHandle(ref, () => ({ addFiles }));
 
   const removeEntry = (entry: Entry) => {
     if (disabled) return;
@@ -451,8 +727,8 @@ export function FileDropzone({
         ref={dropRef}
         role="button"
         tabIndex={disabled ? -1 : 0}
-        aria-labelledby={`${labelId} ${ctaId}`}
-        aria-describedby={hintText ? hintId : undefined}
+        // The hint is visible inside the drop area, so it belongs in the name (WCAG 2.5.3 label in name).
+        aria-labelledby={`${labelId} ${ctaId}${hintText ? ` ${hintId}` : ""}`}
         aria-disabled={disabled || undefined}
         data-state={state}
         onClick={openPicker}
@@ -558,7 +834,7 @@ export function FileDropzone({
               </>
             )}
           </span>
-        </span>
+        </span>{" "}
         {hintText && (
           <span id={hintId} className="text-xs text-zinc-500 dark:text-zinc-400">
             {hintText}
@@ -683,6 +959,41 @@ export function FileDropzone({
                     <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
                       {formatSize(entry.file.size)} · {extensionLabel(entry.file)}
                     </span>
+                    {entry.checking && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+                        <Loader2 className="size-3 motion-safe:animate-spin" aria-hidden /> {pm.checking}
+                      </span>
+                    )}
+                    {!entry.checking && entry.issues && entry.issues.length > 0 && (
+                      <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                        {entry.issues.map((issue) => (
+                          <li
+                            key={issue.id}
+                            className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-amber-50 py-0.5 pl-2 pr-1 text-xs font-medium text-amber-900 ring-1 ring-amber-300/70 dark:bg-amber-400/10 dark:text-amber-200 dark:ring-amber-400/30"
+                          >
+                            {issue.id === "location" ? <MapPin className="size-3.5 shrink-0" aria-hidden /> : <TriangleAlert className="size-3.5 shrink-0" aria-hidden />}
+                            {issue.text}
+                            {issue.fix && (
+                              <button
+                                type="button"
+                                disabled={disabled || entry.fixing}
+                                onClick={() => applyFix(entry, issue)}
+                                // Several files can show the same button: the name says which file it fixes.
+                                aria-label={`${entry.fixing ? pm.fixing : issue.fix === "strip" ? pm.strip : pm.shrink} (${entry.file.name})`}
+                                className="ml-0.5 inline-flex h-7 items-center gap-1 rounded bg-amber-900 px-2 text-[11px] font-semibold text-white outline-none hover:bg-amber-800 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-progress disabled:opacity-70 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200"
+                              >
+                                {entry.fixing ? pm.fixing : issue.fix === "strip" ? pm.strip : pm.shrink}
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!entry.checking && entry.issues && entry.issues.length === 0 && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        <CircleCheck className="size-3.5" aria-hidden /> {pm.allGood}
+                      </span>
+                    )}
                   </span>
                   <button
                     type="button"

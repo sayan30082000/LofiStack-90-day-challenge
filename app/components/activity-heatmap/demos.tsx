@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { CalendarDays, Flame, GitCommitHorizontal, GitPullRequest, MessageSquareCode, RotateCw, Trophy } from "lucide-react";
+import { CalendarDays, GitCommitHorizontal, GitPullRequest, MessageSquareCode, RotateCw, Trophy } from "lucide-react";
 import {
   ActivityHeatmap,
   type HeatmapDatum,
@@ -105,11 +105,9 @@ export function ContributionsDemo() {
 
   return (
     <div className="flex w-full max-w-4xl flex-col gap-4">
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-3">
         <Stat icon={<CalendarDays className="size-4" aria-hidden />} label={range === "rolling" ? "Last 365 days" : `Total in ${range}`} value={num.format(s.total)} />
         <Stat icon={<Trophy className="size-4" aria-hidden />} label="Busiest day" value={s.best.count ? `${s.best.count} on ${shortDate.format(new Date(s.best.day * DAY_MS))}` : "—"} />
-        <Stat icon={<Flame className="size-4" aria-hidden />} label="Longest streak" value={`${s.longest} days`} />
-        <Stat icon={<Flame className="size-4" aria-hidden />} label="Current streak" value={`${s.current} days`} />
       </dl>
 
       <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">

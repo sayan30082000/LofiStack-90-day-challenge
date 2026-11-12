@@ -56,6 +56,7 @@ describe("measureSkeletonLayout", () => {
     const { container } = render(
       <div data-rect={JSON.stringify({ left: 100, top: 50, width: 400, height: 200 })}>
         <article style={{ border: "1px solid" }} data-rect={JSON.stringify({ left: 100, top: 50, width: 400, height: 120 })}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- plain DOM for measuring */}
           <img alt="" data-rect={JSON.stringify({ left: 120, top: 66, width: 40, height: 40 })} />
           <p data-lines={JSON.stringify([{ left: 180, top: 66, width: 300, height: 20 }, { left: 180, top: 86, width: 120, height: 20 }])}>
             A post that wraps onto two lines

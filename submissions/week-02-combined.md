@@ -4,7 +4,7 @@ COMPONENT 1: Bangla Phonetic Input
 Type: input
 Live: https://lofistack-sayan.netlify.app/components/bangla-phonetic-input
 Repo: https://github.com/sayan30082000/LofiStack-90-day-challenge/blob/main/components/ui/bangla-phonetic-input/index.tsx
-Pros: Type Bangla with English letters, Avro-style: "ami tomake bhalobashi" becomes আমি তোমাকে ভালোবাসি as you type. Suggestion bar, 230-word dictionary, paste-to-convert, Ctrl+M to switch. Works with phone keyboards and screen readers.
+Pros: Type Bangla with English letters, Avro-style: "ami tomake bhalobashi" becomes আমি তোমাকে ভালোবাসি as you type. Suggestion bar, 236 everyday words built in, paste-to-convert, Ctrl+M to switch. Works with phone keyboards and screen readers.
 Cons: Rule-based with a small dictionary, so rare words may need picking from the suggestions.
 
 COMPONENT 2: Tear-off Ticket Card

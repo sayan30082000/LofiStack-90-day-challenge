@@ -1,11 +1,29 @@
 import type { Metadata } from "next";
 import { ComponentPage } from "@/components/gallery/ComponentPage";
-import { PinDemo, VariantsDemo, VerifyEmailDemo } from "./demos";
+import { PinDemo, SmsDemo, VariantsDemo, VerifyEmailDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "OTP Input",
-  description: "One-time code boxes with auto-advance, paste support, masking and error, success, loading and disabled states.",
+  description:
+    "A one-time code input you can paste a whole SMS into: it finds the code inside the message. Plus WebOTP autofill on Android, an expiry countdown, a growing resend cooldown and an attempts-left warning.",
 };
+
+const smsCode = `
+<OtpInput
+  label="SMS verification code"
+  groupSize={3}
+  onComplete={verify}
+  // Paste "Your code is 482 913. It expires in 5 minutes…" and 482913 is filled in.
+  smartPaste
+  // Android Chrome: read the code straight from the SMS (WebOTP), no copying.
+  webOtp
+  expiresAt={sentAt + 5 * 60 * 1000}
+  attemptsLeft={attempts}
+  onResend={() => api.sendCode(phone)}
+  resendCooldowns={[30, 60, 120]}   // waits grow with each resend
+/>
+
+extractOtp("Your code is 482 913. Help: +880 1712 345678", 6);   // "482913"`;
 
 const verifyCode = `
 const [code, setCode] = useState("");
@@ -75,6 +93,14 @@ export default function Page() {
       slug="otp-input"
       examples={[
         {
+          title: "Paste the whole SMS",
+          description:
+            "Copy the whole message on the left and paste it into the first box: the code is picked out of the text (the phone number is ignored). The code expires in 5 minutes, Resend unlocks after a cooldown that grows each time, and a warning appears at 2 attempts left.",
+          preview: <SmsDemo />,
+          code: smsCode,
+          minHeight: 380,
+        },
+        {
           title: "Verify your email",
           description:
             "123456 succeeds, anything else shakes the boxes and shows an error. Verifying shows a shimmer, three misses lock the input, and Resend code starts a 30 second cooldown.",
@@ -117,9 +143,17 @@ export default function Page() {
         { name: "maskChar", type: "string", default: '"•"', description: "Character shown in masked boxes." },
         { name: "name", type: "string", description: "Adds a hidden input with the code for native form posts." },
         { name: "size", type: '"md" | "lg"', default: '"md"', description: "Box size. Both are at least 40px wide and 48px tall." },
+        { name: "smartPaste", type: "boolean", default: "true", description: "When pasted text looks like a message, find the code in it with extractOtp: digits split by a space or dash count, the candidate nearest a word like code / OTP / কোড wins, and longer numbers (phones, amounts) are never cut down to fit." },
+        { name: "webOtp", type: "boolean", default: "true", description: "On browsers with the WebOTP API (Android Chrome), read the code from the incoming SMS. Aborted on unmount." },
+        { name: "expiresAt / onExpire", type: "number / () => void", description: "Epoch ms when the code stops working. Shows a countdown (amber in the last 30s), then locks the boxes and calls onExpire once." },
+        { name: "onResend", type: "() => void | Promise<void>", description: "Adds a Resend button after a cooldown. A promise shows a spinner." },
+        { name: "resendCooldowns", type: "number[]", default: "[30, 60, 120]", description: "Seconds to wait before each resend; the last value repeats." },
+        { name: "attemptsLeft", type: "number", description: "Shows a warning at 2 or fewer." },
+        { name: "otpLabels", type: "Partial<OtpLabels>", description: "Wording of the timer, resend, attempts and paste announcements." },
         { name: "className", type: "string", description: "Classes for the root." },
       ]}
       accessibility={[
+        "A code found in a pasted message or read from SMS is announced (\"Code found in the pasted message.\"), and the countdown, resend and attempts lines are linked to every box with aria-describedby.",
         "The boxes sit in a role=\"group\" with an accessible name; each box is a real input labelled \"Digit 1 of 6\" (customisable with boxLabel).",
         "inputMode=\"numeric\" and pattern=\"[0-9]*\" bring up the number pad; the first box has autocomplete=\"one-time-code\" so SMS and email codes can be autofilled into all boxes.",
         "Typing advances, Backspace clears and moves back, Left/Right and Home/End move between boxes. Boxes fill in order, so focusing a later empty box jumps to the first empty one.",

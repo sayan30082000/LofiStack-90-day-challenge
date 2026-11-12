@@ -83,8 +83,31 @@ export interface ActivityHeatmapProps {
   error?: ReactNode;
   /** Shown over the grid when the range has no activity. */
   emptyText?: string;
+  /**
+   * Insight buttons above the grid (longest and current streak, busiest weekday and month).
+   * Pressing one highlights exactly those days and dims the rest.
+   */
+  insights?: boolean;
+  /** Wording of the insight buttons. */
+  insightLabels?: Partial<HeatmapInsightLabels>;
   className?: string;
 }
+
+export interface HeatmapInsightLabels {
+  group: string;
+  longest: (days: number, range: string) => string;
+  current: (days: number) => string;
+  weekday: (weekdayName: string) => string;
+  month: (monthName: string, total: string) => string;
+}
+
+export const DEFAULT_INSIGHT_LABELS: HeatmapInsightLabels = {
+  group: "Insights",
+  longest: (n, r) => `Longest streak: ${n} ${n === 1 ? "day" : "days"} (${r})`,
+  current: (n) => `Current streak: ${n} ${n === 1 ? "day" : "days"}`,
+  weekday: (w) => `Most active on ${w}s`,
+  month: (m, t) => `Best month: ${m} (${t})`,
+};
 
 const DAY_MS = 86_400_000;
 const DEFAULT_FILL = [
@@ -111,6 +134,89 @@ function weekday(day: number) {
 function yearOf(day: number) {
   return new Date(day * DAY_MS).getUTCFullYear();
 }
+
+/* ---------- Insights (pure) ---------- */
+
+export interface HeatmapStreak {
+  /** Days in a row with activity. */
+  length: number;
+  /** YYYY-MM-DD */
+  start: string;
+  end: string;
+}
+
+export interface HeatmapInsights {
+  total: number;
+  activeDays: number;
+  /** Average per day that had any activity. */
+  averagePerActiveDay: number;
+  longestStreak: HeatmapStreak | null;
+  /** The run that reaches the last day (or the day before it, so today isn't over yet). */
+  currentStreak: HeatmapStreak | null;
+  /** 0 Sunday … 6 Saturday, and that weekday's total. */
+  busiestWeekday: { weekday: number; total: number } | null;
+  /** YYYY-MM and that month's total. */
+  busiestMonth: { month: string; total: number } | null;
+  busiestDay: { date: string; count: number } | null;
+}
+
+/** Streaks, busiest weekday and month, and averages for the days from start to end (YYYY-MM-DD, inclusive). */
+export function computeHeatmapInsights(data: HeatmapDatum[], start: string, end: string): HeatmapInsights {
+  const from = toDay(start);
+  const to = toDay(end);
+  const counts = new Map<number, number>();
+  for (const d of data) {
+    const day = toDay(d.date);
+    if (day >= from && day <= to) counts.set(day, (counts.get(day) ?? 0) + d.count);
+  }
+  let total = 0;
+  let activeDays = 0;
+  let longest: [number, number] | null = null;
+  let runStart: number | null = null;
+  let busiestDay: { day: number; count: number } | null = null;
+  const byWeekday = new Array(7).fill(0);
+  const byMonth = new Map<string, number>();
+  for (let d = from; d <= to; d++) {
+    const c = counts.get(d) ?? 0;
+    if (c > 0) {
+      total += c;
+      activeDays++;
+      byWeekday[weekday(d)] += c;
+      const month = toIso(d).slice(0, 7);
+      byMonth.set(month, (byMonth.get(month) ?? 0) + c);
+      if (!busiestDay || c > busiestDay.count) busiestDay = { day: d, count: c };
+      if (runStart === null) runStart = d;
+      if (!longest || d - runStart > longest[1] - longest[0]) longest = [runStart, d];
+    } else runStart = null;
+  }
+  const streak = (a: number, b: number): HeatmapStreak => ({ length: b - a + 1, start: toIso(a), end: toIso(b) });
+
+  // Current streak: walk back from the last day, allowing an empty last day.
+  let current: HeatmapStreak | null = null;
+  const tail = (counts.get(to) ?? 0) > 0 ? to : (counts.get(to - 1) ?? 0) > 0 ? to - 1 : null;
+  if (tail !== null) {
+    let head = tail;
+    while (head - 1 >= from && (counts.get(head - 1) ?? 0) > 0) head--;
+    current = streak(head, tail);
+  }
+
+  const wd = byWeekday.reduce((best, t, i) => (t > (best?.total ?? 0) ? { weekday: i, total: t } : best), null as HeatmapInsights["busiestWeekday"]);
+  let bm: HeatmapInsights["busiestMonth"] = null;
+  for (const [month, t] of byMonth) if (!bm || t > bm.total) bm = { month, total: t };
+
+  return {
+    total,
+    activeDays,
+    averagePerActiveDay: activeDays ? Math.round((total / activeDays) * 10) / 10 : 0,
+    longestStreak: longest ? streak(longest[0], longest[1]) : null,
+    currentStreak: current,
+    busiestWeekday: wd,
+    busiestMonth: bm,
+    busiestDay: busiestDay ? { date: toIso(busiestDay.day), count: busiestDay.count } : null,
+  };
+}
+
+type InsightKey = "longest" | "current" | "weekday" | "month";
 
 const noopSubscribe = () => () => {};
 const localToday = () => {
@@ -152,8 +258,12 @@ export function ActivityHeatmap({
   loading = false,
   error,
   emptyText = "No activity in this period yet.",
+  insights = true,
+  insightLabels,
   className,
 }: ActivityHeatmapProps) {
+  const IL = { ...DEFAULT_INSIGHT_LABELS, ...insightLabels };
+  const [activeInsight, setActiveInsight] = useState<InsightKey | null>(null);
   const id = useId();
   const singular = unitSingular ?? unit.replace(/s$/, "");
   const [innerRange, setInnerRange] = useState<HeatmapRange>(defaultRange);
@@ -188,6 +298,9 @@ export function ActivityHeatmap({
       month: new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }),
       weekday: new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }),
       num: new Intl.NumberFormat(locale),
+      dayMonth: new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }),
+      weekdayLong: new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" }),
+      monthLong: new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" }),
     }),
     [locale],
   );
@@ -248,6 +361,27 @@ export function ActivityHeatmap({
     if (!months.length || months[0].col >= 3) months.unshift({ col: 0, label: fmt.month.format(new Date(start * DAY_MS)) });
     return { start, end, weeks, cells, months, total, busiest };
   }, [endDay, range, weekStart, counts, levels, fmt]);
+
+  const info = useMemo(
+    () => (model && insights ? computeHeatmapInsights(data, toIso(model.start), toIso(model.end)) : null),
+    [model, insights, data],
+  );
+
+  // Days lit up by the pressed insight; everything else dims.
+  const highlight = useMemo(() => {
+    if (!model || !info || !activeInsight) return null;
+    const set = new Set<number>();
+    const span = (a: string, b: string) => {
+      for (let d = toDay(a); d <= toDay(b); d++) set.add(d);
+    };
+    if (activeInsight === "longest" && info.longestStreak) span(info.longestStreak.start, info.longestStreak.end);
+    if (activeInsight === "current" && info.currentStreak) span(info.currentStreak.start, info.currentStreak.end);
+    for (let d = model.start; d <= model.end; d++) {
+      if (activeInsight === "weekday" && info.busiestWeekday && weekday(d) === info.busiestWeekday.weekday) set.add(d);
+      if (activeInsight === "month" && info.busiestMonth && toIso(d).startsWith(info.busiestMonth.month)) set.add(d);
+    }
+    return set;
+  }, [model, info, activeInsight]);
 
   const years = useMemo(() => {
     if (endDay === null) return [];
@@ -356,7 +490,23 @@ export function ActivityHeatmap({
     onRangeChange?.(r);
     setFocusDay(null);
     setTip(null);
+    setActiveInsight(null);
   };
+
+  const insightItems: { key: InsightKey; text: string }[] = [];
+  if (info) {
+    const dm = (iso: string) => fmt.dayMonth.format(new Date(toDay(iso) * DAY_MS));
+    if (info.longestStreak && info.longestStreak.length > 1)
+      insightItems.push({ key: "longest", text: IL.longest(info.longestStreak.length, `${dm(info.longestStreak.start)} – ${dm(info.longestStreak.end)}`) });
+    if (info.currentStreak) insightItems.push({ key: "current", text: IL.current(info.currentStreak.length) });
+    if (info.busiestWeekday)
+      insightItems.push({ key: "weekday", text: IL.weekday(fmt.weekdayLong.format(new Date((3 + info.busiestWeekday.weekday) * DAY_MS))) });
+    if (info.busiestMonth)
+      insightItems.push({
+        key: "month",
+        text: IL.month(fmt.monthLong.format(new Date(toDay(`${info.busiestMonth.month}-01`) * DAY_MS)), fmt.num.format(info.busiestMonth.total)),
+      });
+  }
 
   /* ---------- Render ---------- */
 
@@ -390,6 +540,9 @@ export function ActivityHeatmap({
 
   const rows = Array.from({ length: 7 }, (_, r) => model?.cells.filter((c) => c.row === r) ?? []);
   const isEmpty = model !== null && model.total === 0 && !loading && !error;
+  // Keyboard users must be able to scroll the calendar on narrow screens. Focusable cells
+  // do that; without them (or while loading, when there are no cells) the scroller takes focus.
+  const scrollFocusable = !focusableCells || loading || !model;
 
   return (
     <div className={cn("w-full min-w-0 text-sm text-zinc-600 dark:text-zinc-400", className)}>
@@ -424,6 +577,28 @@ export function ActivityHeatmap({
         )}
       </div>
 
+      {insightItems.length > 0 && !loading && !error && (
+        <div role="group" aria-label={IL.group} className="mb-3 flex flex-wrap gap-1.5">
+          {insightItems.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              aria-pressed={activeInsight === it.key}
+              onClick={() => setActiveInsight((a) => (a === it.key ? null : it.key))}
+              className={cn(
+                "inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3 py-1.5 text-left text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 motion-reduce:transition-none",
+                activeInsight === it.key
+                  ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-400 dark:bg-indigo-500"
+                  : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800",
+              )}
+            >
+              <span aria-hidden>{it.key === "longest" ? "🔥" : it.key === "current" ? "⚡" : it.key === "weekday" ? "📅" : "🏆"}</span>
+              {it.text}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error ? (
         <div
           role="alert"
@@ -439,7 +614,10 @@ export function ActivityHeatmap({
             onScroll={() => {
               if (tip) setTip(null);
             }}
-            className="overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:thin]"
+            tabIndex={scrollFocusable ? 0 : undefined}
+            role={scrollFocusable ? "region" : undefined}
+            aria-label={scrollFocusable ? "Activity calendar" : undefined}
+            className="overflow-x-auto overscroll-x-contain rounded-md pb-2 outline-none [scrollbar-width:thin] focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             {loading || !model ? (
               <svg width={width || left + 53 * step} height={height} aria-busy="true" role="img" aria-label="Loading activity">
@@ -484,7 +662,8 @@ export function ActivityHeatmap({
                         const day = toHeatmapDay(c);
                         const text = describe(day);
                         const fill = fillFor(c.level);
-                        const dim = hoverLevel !== null && hoverLevel !== c.level;
+                        const lit = highlight?.has(c.day) ?? false;
+                        const dim = (hoverLevel !== null && hoverLevel !== c.level) || (highlight !== null && !lit);
                         return (
                           <rect
                             key={c.day}
@@ -519,6 +698,7 @@ export function ActivityHeatmap({
                               onDayClick && "cursor-pointer",
                               fill.className,
                               dim && "opacity-20",
+                              lit && "stroke-zinc-900/70 stroke-[1.5] dark:stroke-white/80",
                             )}
                           />
                         );

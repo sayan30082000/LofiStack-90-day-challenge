@@ -62,9 +62,10 @@ describe("suggestBangla", () => {
     expect(new Set(s).size).toBe(s.length);
   });
 
-  it("has 200+ everyday words, all in Bangla script", () => {
+  it("keeps 100+ exceptions to the rules, all in Bangla script", () => {
+    // Words the rules already spell right are left out (see tests/data-integrity.test.ts).
     const words = Object.values(DEFAULT_BANGLA_DICTIONARY).flat();
-    expect(Object.keys(DEFAULT_BANGLA_DICTIONARY).length).toBeGreaterThan(200);
+    expect(Object.keys(DEFAULT_BANGLA_DICTIONARY).length).toBeGreaterThan(100);
     for (const w of words) expect(w).toMatch(/^[ঀ-৿ ]+$/);
   });
 });

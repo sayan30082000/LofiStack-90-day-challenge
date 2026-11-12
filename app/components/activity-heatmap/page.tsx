@@ -4,7 +4,8 @@ import { ContributionsDemo, ReadingDemo, StatesDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "Activity Heatmap",
-  description: "GitHub-style contribution calendar in hand-built SVG with tooltips, keyboard navigation and a year selector.",
+  description:
+    "A contribution calendar that explains itself: insight buttons for your longest and current streak, busiest weekday and best month light up exactly those days. Hand-built SVG with tooltips, keyboard navigation and a year selector.",
 };
 
 const contributionsCode = `
@@ -59,7 +60,7 @@ export default function Page() {
         {
           title: "Contributions",
           description:
-            "Two and a half years of seeded data. Pick the rolling year or a calendar year, hover or focus a day for its tooltip, click it for details, and hover the legend to isolate one intensity level. On narrow screens the grid scrolls, starting at the latest week.",
+            "Press an insight (🔥 Longest streak, ⚡ Current streak, 📅 Most active on…, 🏆 Best month) to light up exactly those days. Two and a half years of seeded data. Pick the rolling year or a calendar year, hover or focus a day for its tooltip, click it for details, and hover the legend to isolate one intensity level. On narrow screens the grid scrolls, starting at the latest week.",
           preview: <ContributionsDemo />,
           code: contributionsCode,
           minHeight: 460,
@@ -105,6 +106,8 @@ export default function Page() {
         { name: "loading", type: "boolean", default: "false", description: "Pulsing skeleton grid; disables the year selector." },
         { name: "error", type: "ReactNode", description: "Replaces the grid with an alert." },
         { name: "emptyText", type: "string", default: '"No activity in this period yet."', description: "Shown over the grid when the range has no activity." },
+        { name: "insights", type: "boolean", default: "true", description: "Insight buttons above the grid: longest streak (with dates), current streak, busiest weekday, best month. Pressing one highlights exactly those days and dims the rest; pressing it again clears it." },
+        { name: "insightLabels", type: "Partial<HeatmapInsightLabels>", default: "DEFAULT_INSIGHT_LABELS", description: "Wording of the insights, e.g. for another language." },
         { name: "className", type: "string", description: "Classes for the root." },
       ]}
       types={[
@@ -118,6 +121,7 @@ export default function Page() {
         },
       ]}
       accessibility={[
+        "Insight buttons use aria-pressed; the highlighted days keep their full colour and an outline while the rest dim, so the pattern is visible without relying on colour alone.",
         "The SVG has an accessible summary: total for the range plus the busiest day. With focusableCells={false} it is a single role=\"img\".",
         "With focusable cells (default) the SVG is a role=\"grid\" of 7 weekday rows; each cell is a gridcell labelled like \"12 contributions on Mar 4, 2026\", with aria-selected on the selected day.",
         "One Tab stop (roving tabindex). Left/Right move a week, Up/Down a day, Home/End the start/end of the week, Ctrl+Home/End the whole range, PageUp/PageDown four weeks, Enter/Space clicks.",

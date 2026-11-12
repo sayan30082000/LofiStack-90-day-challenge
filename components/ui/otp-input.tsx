@@ -10,7 +10,7 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, RotateCw, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type OtpType = "numeric" | "alphanumeric";
@@ -54,8 +54,79 @@ export interface OtpInputProps {
   /** Submitted with forms through a hidden input. */
   name?: string;
   size?: "md" | "lg";
+  /** Pull the code out of a pasted SMS or email ("Your code is 482 913…"). */
+  smartPaste?: boolean;
+  /** On Android Chrome, read the code straight from the SMS with the WebOTP API. */
+  webOtp?: boolean;
+  /** When the code stops working (epoch ms). Shows a countdown and locks the boxes after. */
+  expiresAt?: number;
+  /** Called once when expiresAt passes. */
+  onExpire?: () => void;
+  /** Shows a Resend button after a cooldown. Return a promise to show a spinner. */
+  onResend?: () => void | Promise<void>;
+  /** Seconds to wait before each resend; the last value repeats. Grows so codes can't be spammed. */
+  resendCooldowns?: number[];
+  /** Attempts the person has left. Warns at 2 or fewer. */
+  attemptsLeft?: number;
+  /** Wording for the timer, resend and attempts lines. */
+  otpLabels?: Partial<OtpLabels>;
   className?: string;
 }
+
+export interface OtpLabels {
+  expiresIn: (time: string) => string;
+  expired: string;
+  resendIn: (time: string) => string;
+  resend: string;
+  resending: string;
+  attemptsLeft: (n: number) => string;
+  /** Announced when a code is found in pasted text or read from SMS. */
+  filledFrom: (source: "paste" | "sms") => string;
+}
+
+export const DEFAULT_OTP_LABELS: OtpLabels = {
+  expiresIn: (t) => `Code expires in ${t}`,
+  expired: "This code has expired. Request a new one.",
+  resendIn: (t) => `Resend code in ${t}`,
+  resend: "Resend code",
+  resending: "Sending…",
+  attemptsLeft: (n) => (n === 1 ? "1 attempt left" : `${n} attempts left`),
+  filledFrom: (s) => (s === "sms" ? "Code filled in from your SMS." : "Code found in the pasted message."),
+};
+
+const CODE_WORDS = /(code|otp|pin|passcode|verification|verify|one[- ]time|কোড|ওটিপি)/i;
+
+/**
+ * Finds a one-time code inside free text, e.g. "Your Lofi code is 482 913. Don't share it."
+ * Accepts digits split by a space or dash ("482-913"); prefers the candidate closest to a word like
+ * "code" or "OTP", and never picks a longer number (a phone number or amount) by truncating it.
+ */
+export function extractOtp(text: string, length: number, type: OtpType = "numeric"): string | null {
+  const unit = type === "numeric" ? "[0-9]" : "[A-Za-z0-9]";
+  // Runs of code characters with optional single space/dash separators.
+  const re = new RegExp(`(?<![A-Za-z0-9])${unit}(?:[ -]?${unit})*(?![A-Za-z0-9])`, "g");
+  const keyword = text.search(CODE_WORDS);
+  let best: { code: string; score: number } | null = null;
+  for (const m of text.matchAll(re)) {
+    // "482 913" is one code, and "482913 5 min" is a code followed by another number, so take the
+    // leading groups that add up to the code length. Never from the middle: in "+880 1712 345678"
+    // the last group is part of a phone number, not a code.
+    const groups = m[0].split(/[ -]/);
+    let code = "";
+    for (const g of groups) {
+      code += g;
+      if (code.length >= length) break;
+    }
+    if (code.length !== length) continue;
+    // Alphanumeric codes still need at least one digit, so plain words don't count.
+    if (type === "alphanumeric" && !/\d/.test(code)) continue;
+    const score = keyword < 0 ? -m.index : -Math.abs(m.index - keyword);
+    if (!best || score > best.score) best = { code, score };
+  }
+  return best ? (type === "alphanumeric" ? best.code.toUpperCase() : best.code) : null;
+}
+
+const fmtClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, "0")}`;
 
 const SIZES = {
   md: { box: "h-12 w-10 text-lg sm:w-11", gap: "gap-1.5 sm:gap-2" },
@@ -106,12 +177,69 @@ export function OtpInput({
   maskChar = "•",
   name,
   size = "md",
+  smartPaste = true,
+  webOtp = true,
+  expiresAt,
+  onExpire,
+  onResend,
+  resendCooldowns = [30, 60, 120],
+  attemptsLeft,
+  otpLabels,
   className,
 }: OtpInputProps) {
   const id = useId();
   const errorId = `${id}-error`;
   const successId = `${id}-success`;
+  const metaId = `${id}-meta`;
   const sz = SIZES[size];
+  const L = { ...DEFAULT_OTP_LABELS, ...otpLabels };
+  const [notice, setNotice] = useState("");
+
+  // One clock for the expiry and resend countdowns, ticking only while one of them runs.
+  const [now, setNow] = useState<number | null>(null);
+  const [resendCount, setResendCount] = useState(0);
+  const [resendAt, setResendAt] = useState<number | null>(null);
+  const [resending, setResending] = useState(false);
+  useEffect(() => {
+    if (expiresAt === undefined && !onResend) return;
+    const tick = () => setNow(Date.now());
+    const t = setInterval(tick, 1000);
+    const first = setTimeout(tick, 0);
+    return () => {
+      clearInterval(t);
+      clearTimeout(first);
+    };
+  }, [expiresAt, onResend]);
+  // The first cooldown starts when the clock first ticks (the code was just sent).
+  const cooldownEnd = resendAt ?? (now !== null && onResend ? now + resendCooldowns[0] * 1000 : null);
+  if (onResend && resendAt === null && now !== null) setResendAt(now + resendCooldowns[0] * 1000);
+  const secondsLeft = expiresAt !== undefined && now !== null ? Math.max(0, Math.ceil((expiresAt - now) / 1000)) : null;
+  const expired = secondsLeft === 0;
+  const resendWait = cooldownEnd !== null && now !== null ? Math.max(0, Math.ceil((cooldownEnd - now) / 1000)) : null;
+
+  const expiredFired = useRef(false);
+  useEffect(() => {
+    if (!expired) {
+      expiredFired.current = false;
+      return;
+    }
+    if (expiredFired.current) return;
+    expiredFired.current = true;
+    onExpire?.();
+  }, [expired, onExpire]);
+
+  const resend = async () => {
+    if (!onResend || resending) return;
+    setResending(true);
+    try {
+      await onResend();
+    } finally {
+      setResending(false);
+      const next = resendCount + 1;
+      setResendCount(next);
+      setResendAt(Date.now() + resendCooldowns[Math.min(next, resendCooldowns.length - 1)] * 1000);
+    }
+  };
 
   const [inner, setInner] = useState(defaultValue);
   const controlled = valueProp !== undefined;
@@ -122,7 +250,7 @@ export function OtpInput({
   // Set while we move focus ourselves, so the "jump to first empty box" redirect doesn't fight it.
   const programmatic = useRef(false);
   const groupRef = useRef<HTMLDivElement>(null);
-  const readOnly = loading || disabled;
+  const readOnly = loading || disabled || expired;
 
   const sanitize = useCallback(
     (raw: string) => {
@@ -179,11 +307,45 @@ export function OtpInput({
   const onPaste = (i: number, e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     if (readOnly) return;
-    const chars = sanitize(e.clipboardData.getData("text"));
+    const text = e.clipboardData.getData("text");
+    // A whole message ("Your code is 482 913…"): find the code instead of keeping every digit.
+    const looksLikeMessage = sanitize(text).length > length || /[^\sA-Za-z0-9-]|[A-Za-z]{3,}/.test(text);
+    if (smartPaste && looksLikeMessage) {
+      const found = extractOtp(text, length, type);
+      if (found) {
+        insertAt(0, found);
+        setNotice(L.filledFrom("paste"));
+        return;
+      }
+    }
+    const chars = sanitize(text);
     if (!chars) return;
     if (chars.length >= length) insertAt(0, chars.slice(0, length));
     else insertAt(i, chars);
   };
+
+  // Android Chrome can hand over the code from an incoming SMS (WebOTP), no copying needed.
+  const fillRef = useRef<(code: string) => void>(() => {});
+  useEffect(() => {
+    fillRef.current = (code: string) => {
+      const clean = sanitize(code).slice(0, length);
+      if (clean.length !== length) return;
+      commit(clean);
+      setNotice(L.filledFrom("sms"));
+    };
+  });
+  useEffect(() => {
+    if (!webOtp || disabled || typeof window === "undefined" || !("OTPCredential" in window)) return;
+    const ac = new AbortController();
+    (navigator.credentials.get({ otp: { transport: ["sms"] }, signal: ac.signal } as CredentialRequestOptions) as Promise<
+      (Credential & { code?: string }) | null
+    >)
+      .then((cred) => cred?.code && fillRef.current(cred.code))
+      .catch(() => {
+        // Aborted, unsupported or no SMS: typing still works.
+      });
+    return () => ac.abort();
+  }, [webOtp, disabled]);
 
   const onKeyDown = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
     switch (e.key) {
@@ -229,8 +391,10 @@ export function OtpInput({
     }
   };
 
-  const state = error ? "error" : success ? "success" : "idle";
-  const describedBy = error ? errorId : success && successMessage ? successId : undefined;
+  const state = error || expired ? "error" : success ? "success" : "idle";
+  const showMeta = !success && (secondsLeft !== null || onResend || attemptsLeft !== undefined);
+  const describedBy =
+    [error ? errorId : success && successMessage ? successId : null, showMeta ? metaId : null].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className={cn("inline-flex flex-col gap-2", className)}>
@@ -289,7 +453,7 @@ export function OtpInput({
                   aria-invalid={error ? true : undefined}
                   aria-describedby={describedBy}
                   disabled={disabled}
-                  readOnly={loading}
+                  readOnly={loading || expired}
                   autoFocus={autoFocus && i === Math.min(value.length, length - 1)}
                   value={char}
                   onChange={(e) => onInput(i, e.target.value)}
@@ -348,6 +512,47 @@ export function OtpInput({
           {successMessage}
         </p>
       )}
+
+      {showMeta && (
+        <div id={metaId} className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          {secondsLeft !== null &&
+            (expired ? (
+              <p className="flex items-center gap-1.5 font-medium text-rose-700 dark:text-rose-400">
+                <AlertCircle className="size-4 shrink-0" aria-hidden />
+                {L.expired}
+              </p>
+            ) : (
+              <p className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
+                <Timer className="size-4 shrink-0" aria-hidden />
+                <span className={cn("tabular-nums", secondsLeft <= 30 && "font-medium text-amber-700 dark:text-amber-400")}>
+                  {L.expiresIn(fmtClock(secondsLeft))}
+                </span>
+              </p>
+            ))}
+          {attemptsLeft !== undefined && attemptsLeft <= 2 && (
+            <p className="font-medium text-amber-700 dark:text-amber-400">{L.attemptsLeft(attemptsLeft)}</p>
+          )}
+          {onResend &&
+            (resendWait !== null && resendWait > 0 ? (
+              <p className="tabular-nums text-zinc-600 dark:text-zinc-400">{L.resendIn(fmtClock(resendWait))}</p>
+            ) : (
+              <button
+                type="button"
+                onClick={resend}
+                disabled={resending || resendWait === null}
+                className="-mx-2 inline-flex h-10 items-center gap-1.5 rounded-lg px-2 font-medium text-indigo-700 outline-none hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-progress disabled:opacity-70 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+              >
+                <RotateCw className={cn("size-4", resending && "motion-safe:animate-spin")} aria-hidden />
+                {resending ? L.resending : L.resend}
+              </button>
+            ))}
+        </div>
+      )}
+
+      {/* Announces codes found in a pasted message or read from SMS. */}
+      <p role="status" className="sr-only">
+        {notice}
+      </p>
     </div>
   );
 }

@@ -10,6 +10,59 @@ import { cn } from "@/lib/utils";
 
 const MEMBER_NUMBER = "4096 2187 0042 9918";
 
+/* ---------- A fixed light, and phone tilt ---------- */
+
+export function LightDemo() {
+  const xId = useId();
+  const yId = useId();
+  const [x, setX] = useState(-0.6);
+  const [y, setY] = useState(-0.7);
+  const where = `${y < -0.3 ? "top" : y > 0.3 ? "bottom" : "middle"} ${x < -0.3 ? "left" : x > 0.3 ? "right" : "centre"}`;
+
+  return (
+    <div className="grid w-full max-w-2xl items-center gap-8 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <TiltCard
+        light={{ x, y }}
+        maxTilt={14}
+        wrapperClassName="w-full max-w-[18rem] justify-self-center"
+        className="aspect-[5/7] w-full rounded-2xl bg-[linear-gradient(160deg,#0f172a,#1e293b_45%,#0e7490)] p-5 text-white ring-1 ring-white/10"
+      >
+        <div className="flex h-full flex-col">
+          <p data-depth="20" className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">Collector · 01/30</p>
+          <div data-depth="45" className="mx-auto mt-6 grid size-28 place-items-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#a5f3fc,#0891b2_60%,#164e63)] text-4xl shadow-xl shadow-cyan-950/50">
+            <span aria-hidden>🌊</span>
+          </div>
+          <div data-depth="30" className="mt-auto">
+            <h3 className="text-2xl font-bold tracking-tight">Monsoon</h3>
+            <p className="mt-1 text-sm text-cyan-100">Tilt me. The light stays where it is, so the shine slides across the card.</p>
+          </div>
+        </div>
+      </TiltCard>
+
+      <div className="flex flex-col gap-4 text-sm">
+        <p className="font-medium">
+          Light from the <span className="text-cyan-700 dark:text-cyan-300">{where}</span>
+        </p>
+        <div>
+          <label htmlFor={xId} className="text-zinc-600 dark:text-zinc-400">
+            Left ↔ right
+          </label>
+          <input id={xId} type="range" min={-1} max={1} step={0.1} value={x} onChange={(e) => setX(Number(e.target.value))} className="mt-1 h-10 w-full accent-cyan-600" />
+        </div>
+        <div>
+          <label htmlFor={yId} className="text-zinc-600 dark:text-zinc-400">
+            Top ↔ bottom
+          </label>
+          <input id={yId} type="range" min={-1} max={1} step={0.1} value={y} onChange={(e) => setY(Number(e.target.value))} className="mt-1 h-10 w-full accent-cyan-600" />
+        </div>
+        <p className="text-zinc-600 dark:text-zinc-400">
+          On a phone, tilt the phone itself: the card follows, calibrated to how you hold it. iPhone asks once through an Enable motion button.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function MembershipDemo() {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);

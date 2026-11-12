@@ -77,7 +77,7 @@ export default function Page() {
         { name: "defaultBangla", type: "boolean", default: "true", description: "Start in Bangla or English. The toggle and Ctrl+M switch." },
         { name: "onModeChange", type: "(bangla: boolean) => void", description: "Called when the language switches." },
         { name: "multiline / rows", type: "boolean / number", default: "false / 3", description: "Textarea instead of a single line." },
-        { name: "dictionary", type: "Record<string, string | string[]>", description: "Extra or overriding words, keyed in lowercase phonetic English. Merged with DEFAULT_BANGLA_DICTIONARY (about 230 everyday words)." },
+        { name: "dictionary", type: "Record<string, string | string[]>", description: "Extra or overriding words, keyed in lowercase phonetic English. Merged with DEFAULT_BANGLA_DICTIONARY: about 100 words the rules alone would spell wrong. Together they cover 236 tested everyday words." },
         { name: "maxSuggestions", type: "number", default: "4", description: "Bangla suggestions per word. The English original is always added last." },
         { name: "convertPaste", type: "boolean", default: "true", description: "Convert phonetic English pasted while in Bangla mode." },
         { name: "onCommit", type: "(bangla: string, roman: string) => void", description: "Called each time a word is converted." },

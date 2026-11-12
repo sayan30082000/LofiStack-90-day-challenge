@@ -45,6 +45,38 @@ const STATES = {
   "/components/ticket-card": [
     { label: "stub torn off", run: (p) => p.getByRole("button", { name: "Tear off stub" }).first().click() },
   ],
+  "/components/otp-input": [
+    {
+      label: "wrong code",
+      run: async (p) => {
+        await p.getByLabel("Digit 1 of 6").nth(1).pressSequentially("111111");
+        await p.waitForTimeout(1200);
+      },
+    },
+  ],
+  "/components/activity-heatmap": [
+    { label: "longest streak lit", run: (p) => p.getByRole("button", { name: /^Longest streak/ }).first().click() },
+  ],
+  "/components/file-dropzone": [
+    {
+      label: "every check failing",
+      run: async (p) => {
+        for (const name of ["Photo with GPS", "Blurry photo", "Tiny logo", "Big photo", "Contacts CSV"]) {
+          await p.getByRole("button", { name }).click();
+        }
+        // Issue chips (amber <li>s); the same words also appear in the build prompt.
+        await p.locator("li.bg-amber-50", { hasText: "Looks blurry" }).waitFor({ timeout: 15000 });
+        await p.locator("li.bg-amber-50", { hasText: /^Large image/ }).waitFor({ timeout: 15000 });
+      },
+    },
+    {
+      label: "location removed",
+      run: async (p) => {
+        await p.getByRole("button", { name: /^Remove location/ }).click();
+        await p.locator("li.bg-amber-50", { hasText: "Contains GPS location" }).waitFor({ state: "detached", timeout: 15000 });
+      },
+    },
+  ],
   "/components/tree-view": [
     { label: "changes only", run: (p) => p.getByRole("button", { name: /^Changes/ }).first().click() },
   ],
@@ -72,7 +104,6 @@ try {
         await page.waitForTimeout(400);
       }
       const violations = await page.evaluate(async () => {
-        // eslint-disable-next-line no-undef
         const r = await axe.run(document, {
           runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
           resultTypes: ["violations"],

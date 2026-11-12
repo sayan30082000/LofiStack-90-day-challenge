@@ -70,6 +70,24 @@ export const agentLogs: AgentLog[] = [
       "The first run found 420 violations (73 unique elements) on every page: faint grey text at 2.6:1 in light and 4.1:1 in dark mode, code-highlighting colours down to 3.3:1, a disabled field that faded its own labels, and scrollable tables, code blocks and prompts that keyboard users couldn't reach. After the fixes all 56 runs report 0 violations. npm run a11y re-runs the audit and writes docs/a11y-report.md, and 28 new axe tests in npm test (116 total) guard every demo. Saved about a day of manual checking.",
     automated: true,
   },
+  {
+    week: 5,
+    task: "Clean and validate the gallery's own data: the prompt library, registry, agent logs and Bangla dictionary",
+    agent: "Claude Code",
+    workflow: "Treat this project's data like a messy spreadsheet. Check the prompt library (unique numbers, slugs and names; only the challenge's Type labels; 2 per week; no empty fields, stray or invisible characters; kebab-case slugs; every prompt names its route), the registry against the prompts and the files on disk, the agent logs for repeated weeks or task kinds, and the Bangla dictionary for bad keys, unnormalised Unicode and entries the transliteration rules already produce. Snapshot the dictionary before changing anything, clean it, and turn every check into a test so bad data fails the build.",
+    result:
+      "The prompt library, registry and logs were clean. The Bangla dictionary wasn't: 131 of its 236 entries (56%) did nothing, because the rules already spelled those words exactly right (ami → আমি, kintu → কিন্তু). Removing them left 105 real exceptions. A snapshot test proves all 236 words still give the same first suggestion. 12 data checks now run in npm test, so bad data fails the build before it reaches the site. Saved about 2 hours of manual checking.",
+    automated: true,
+  },
+  {
+    week: 6,
+    task: "Draft two emails: a progress update to the challenge lead and a note to a teammate about duplicate components",
+    agent: "Claude Code",
+    workflow: "Draft two emails using only facts from this repo (registry, git history, prompt library), with [placeholders] for anything you don't know. 1) A progress update to the challenge lead: Weeks 1–6 with links, the late Week 5, and why Week 2 was swapped. 2) A note to Muntasir, whose Week 1 Before-After Slider clashes with my planned Week 14, suggesting we share plans ahead. Each under 250 words, friendly and direct. Save them as drafts outside the public repo and don't send anything.",
+    result:
+      "Two ready-to-edit drafts in about 10 minutes, every claim traceable to the repo. Writing them surfaced a real problem: my Week 14 Before/After Slider has to be replaced before Week 14. The drafts are kept outside the public repo and were not sent; sending them is my decision. Saved about 45 minutes.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -108,16 +126,16 @@ Add an "npm test" script, run the tests, fix any real bug you find in the compon
   {
     week: 5,
     kind: "Data cleanup",
-    task: "Clean and normalise a messy client spreadsheet",
-    agent: "Claude",
-    prompt: `Here is a CSV export of client contacts (attached). Remove duplicates, split full names into first/last, standardise phone numbers to E.164 and dates to YYYY-MM-DD, flag rows with invalid emails in a new column, and return the cleaned CSV plus a short summary of every change you made.`,
+    task: "Clean and validate the gallery's own data: the prompt library, registry, agent logs and Bangla dictionary",
+    agent: "Claude Code",
+    prompt: `Treat this project's data like a messy spreadsheet. Check the prompt library (unique numbers, slugs and names; only the challenge's Type labels; 2 per week; no empty fields, stray or invisible characters; kebab-case slugs; every prompt names its route), the registry against the prompts and the files on disk, the agent logs for repeated weeks or task kinds, and the Bangla dictionary for bad keys, unnormalised Unicode and entries the transliteration rules already produce. Snapshot the dictionary before changing anything, clean it, and turn every check into a test so bad data fails the build.`,
   },
   {
     week: 6,
     kind: "Email drafting",
-    task: "Draft follow-up emails for this week's client conversations",
-    agent: "Claude",
-    prompt: `Using these call notes (pasted below), draft one follow-up email per client. Each email: a subject line, a 3-sentence recap, the agreed next steps as bullets with owners and dates, and a polite close. Keep each under 150 words and match a friendly, professional tone.`,
+    task: "Draft two emails: a progress update to the challenge lead and a note to a teammate about duplicate components",
+    agent: "Claude Code",
+    prompt: `Draft two emails using only facts from this repo (registry, git history, prompt library), with [placeholders] for anything you don't know. 1) A progress update to the challenge lead: Weeks 1–6 with links, the late Week 5, and why Week 2 was swapped. 2) A note to Muntasir, whose Week 1 Before-After Slider clashes with my planned Week 14, suggesting we share plans ahead. Each under 250 words, friendly and direct. Save them as drafts outside the public repo and don't send anything.`,
   },
   {
     week: 7,

@@ -15,19 +15,19 @@ Build the "File Dropzone" component (#18, Type: form) for my LofiStack component
 Route: /components/file-dropzone
 
 What it does:
-- Drop area plus click-to-browse; highlights on drag-over (and shows a reject style for wrong types).
-- Validates accepted types, maxSize and maxFiles with a clear message per rejected file.
-- Image thumbnails via URL.createObjectURL (revoked on remove/unmount); other files show a type icon.
-- File list with name, formatted size and remove button.
+- Drop area plus click-to-browse, drag-over and reject styles, validation of accept, maxSize and maxFiles with a message per rejected file, image thumbnails via URL.createObjectURL (revoked on remove/unmount) and a file list with name, size and remove button.
+- Pre-upload checks (preflight, on by default) run on each added file and show amber issue chips: "Contains GPS location" (exported jpegHasGps(bytes) reads the EXIF APP1 segment, both byte orders, and looks for a non-empty GPS IFD), "Looks blurry" (exported sharpness(): variance of the Laplacian on a downscaled grey copy, below blurThreshold), "Only 96 × 96 px (needs 400 × 400)" (minWidth/minHeight), "Large image (3.4 MB)" (shrinkAbove), and for CSVs "Missing columns: email" and "2 empty rows" (exported checkCsv(text, required), matching headers ignoring case, spaces and dashes).
+- One-click fixes: Remove location and Shrink re-encode the image on a canvas (which drops all metadata), shrink to shrinkTo px on the long side, replace the file and its preview, announce the result ("photo.jpg shrunk from 3.4 MB to 610 KB") and re-run the checks. Clean files show "Looks good".
+- A ref handle (FileDropzoneHandle.addFiles) lets other UI add files. All text is replaceable through messages and preflightMessages.
 
 Props (export an interface named FileDropzoneProps):
-accept?: string[], maxSize (bytes), maxFiles, multiple, onFilesChange(files), label, hint, disabled
+accept?: string[], maxSize, maxFiles, multiple, onFilesChange(files), label, hint, disabled, name, formatSize?, messages, preflight: false | { location, blurThreshold, minWidth, minHeight, shrinkAbove, shrinkTo, csvColumns }, preflightMessages, ref
 
 Accessibility:
-Hidden file input with a label; drop area is focusable and opens the picker with Enter/Space; errors announced in a live region.
+Hidden file input with a label; the drop area is focusable and opens the picker with Enter/Space; issues are text, not colour alone; fix buttons start with their visible text and add the file name ("Remove location (photo.jpg)"); rejections, checks and fixes are announced once in a polite live region.
 
 Demo page shows:
-Images only, max 2MB, up to 5; a single-PDF example; and a disabled example.
+1) Checks before upload with sample buttons that generate real files in the browser: a photo with GPS (Dhaka) in its EXIF, a blurry photo, a 96 px logo, a 3600 × 2400 photo to shrink, and a contacts CSV missing a column. 2) Images only, max 2 MB, up to 5. 3) A single PDF. 4) Disabled.
 
 Project context: this goes into my existing LofiStack gallery (Next.js App Router + TypeScript + Tailwind CSS v4, lucide-react icons, cn() helper in lib/utils.ts, shared <ComponentPage> layout in components/gallery/ComponentPage.tsx, registry in lib/registry.ts).
 
@@ -61,19 +61,19 @@ Build the "3D Tilt Card" component (#24, Type: card) for my LofiStack component 
 Route: /components/tilt-card
 
 What it does:
-- Rotates toward the pointer up to maxTilt degrees with perspective.
-- Glare highlight follows the pointer.
-- Child layers with a data-depth attribute get translateZ for parallax.
-- Smooth reset on leave; disabled on touch and reduced motion.
+- Rotates toward the pointer up to maxTilt degrees with perspective, scales slightly, resets smoothly on leave, and gives child layers with data-depth a translateZ for parallax.
+- light="pointer" (default) puts the glare under the pointer. light={{ x, y }} (-1 to 1) is a fixed lamp: exported pure lightFor(rx, ry, maxTilt, light) slides the reflection opposite to the tilt like a real glossy surface and casts the drop shadow away from the lamp, and the resting card already shows a soft shine near the light.
+- Phone tilt (motion, default on): on touch devices the card follows DeviceOrientation instead of touch, calibrated to how the phone is held when it starts and again after rotating to landscape. Exported pure orientationToTilt(reading, base, maxTilt, range) maps a ±25° change to full tilt. On iOS an Enable motion button asks for permission first.
+- Reduced motion and disabled give a flat card; pointer tilt ignores touch.
 
 Props (export an interface named TiltCardProps):
-children, maxTilt (default 12), glare (default true), scale (default 1.03), perspective (default 1000), className, disabled
+children, maxTilt (12), glare (true), glareColor, scale (1.03), perspective (1000), shadow, resetDuration, disabled, motion (true), motionLabel, light: 'pointer' | { x, y }, className, wrapperClassName
 
 Accessibility:
-Motion is decorative; children keep their own semantics; a subtle lift on focus-within so keyboard users get feedback.
+Motion is decorative; children keep their own semantics; focus-within gives a subtle lift; the motion permission button is a real labelled button; nothing moves under prefers-reduced-motion.
 
 Demo page shows:
-A membership card ("LOFI MEMBER" with name and number in layers), a game cover card, and a plain image card.
+1) A collector card "Monsoon" in depth layers under a fixed light, with sliders that move the light. 2) A membership card. 3) A game cover. 4) A plain image card.
 
 Project context: this goes into my existing LofiStack gallery (Next.js App Router + TypeScript + Tailwind CSS v4, lucide-react icons, cn() helper in lib/utils.ts, shared <ComponentPage> layout in components/gallery/ComponentPage.tsx, registry in lib/registry.ts).
 

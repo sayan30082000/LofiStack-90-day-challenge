@@ -226,58 +226,52 @@ export type BanglaDictionary = Record<string, string | string[]>;
  * it fixes spellings the rules can't guess (তোমাকে, ভালোবাসি, ঢাকা) and is offered first.
  */
 export const DEFAULT_BANGLA_DICTIONARY: BanglaDictionary = {
-  // people and pronouns
-  ami: "আমি", amar: "আমার", amake: "আমাকে", amra: "আমরা", amader: "আমাদের",
-  tumi: "তুমি", tomar: "তোমার", tomake: "তোমাকে", tomra: "তোমরা", tomader: "তোমাদের",
+  tomar: "তোমার", tomake: "তোমাকে", tomra: "তোমরা", tomader: "তোমাদের",
   apni: "আপনি", apnar: "আপনার", apnake: "আপনাকে", apnara: "আপনারা",
-  se: "সে", tar: "তার", take: "তাকে", tara: "তারা", tader: "তাদের",
-  ke: "কে", ki: ["কী", "কি"], keno: "কেন", kemon: "কেমন", kothay: "কোথায়", kokhon: "কখন",
-  kobe: "কবে", koto: "কত", kon: "কোন", keu: "কেউ", kichu: "কিছু", shob: "সব", sob: "সব", sobai: "সবাই",
-  ei: "এই", oi: "ওই", eta: "এটা", ota: "ওটা", sheta: "সেটা", ekhane: "এখানে", okhane: "ওখানে",
+  ki: ["কী", "কি"], kothay: "কোথায়",
+  kon: "কোন", shob: "সব",
+  oi: "ওই", eta: "এটা", ota: "ওটা", sheta: "সেটা", okhane: "ওখানে",
   // time
-  ekhon: "এখন", tokhon: "তখন", aj: "আজ", ajke: "আজকে", kal: "কাল", kalke: "কালকে", porshu: "পরশু",
-  din: "দিন", rat: "রাত", shokal: "সকাল", sokal: "সকাল", dupur: "দুপুর", bikal: "বিকাল",
-  shondhya: "সন্ধ্যা", sondha: "সন্ধ্যা", shoptaho: "সপ্তাহ", mash: "মাস", bochor: "বছর", shomoy: "সময়", somoy: "সময়",
+  kalke: "কালকে",
+  shokal: "সকাল",
+  shondhya: "সন্ধ্যা", sondha: "সন্ধ্যা", shoptaho: "সপ্তাহ", mash: "মাস", shomoy: "সময়",
   // yes, no, to be
-  ha: "হ্যাঁ", hya: "হ্যাঁ", na: "না", nai: "নাই", nei: "নেই", ache: "আছে", achi: "আছি", acho: "আছো",
-  achen: "আছেন", chilo: "ছিল", chilam: "ছিলাম", hobe: "হবে", hoy: "হয়", hoyeche: "হয়েছে", holo: "হলো",
-  // verbs
-  kori: "করি", kore: "করে", korbo: "করব", korchi: "করছি", korechi: "করেছি", korte: "করতে",
-  korun: "করুন", koro: "করো", jai: "যাই", jabo: "যাব", jacchi: "যাচ্ছি", gelam: "গেলাম", jao: "যাও",
+  ha: "হ্যাঁ", hya: "হ্যাঁ", acho: "আছো",
+  holo: "হলো",
+  koro: "করো", jai: "যাই", jabo: "যাব", jacchi: "যাচ্ছি", jao: "যাও",
   jan: "যান", ashi: "আসি", asbo: "আসব", ashbo: "আসব", ashchi: "আসছি", esho: "এসো", ashun: "আসুন",
-  dekho: "দেখো", dekhi: "দেখি", dekha: "দেখা", bolo: "বলো", boli: "বলি", bolchi: "বলছি", bolun: "বলুন",
-  shuno: "শোনো", shono: "শোনো", pori: "পড়ি", pora: "পড়া", lekha: "লেখা", likhi: "লিখি", khai: "খাই",
-  khabo: "খাব", khawa: "খাওয়া", chai: "চাই", dao: "দাও", parbo: "পারব", pari: "পারি", jani: "জানি", janina: "জানি না",
+  dekho: "দেখো", bolo: "বলো",
+  shuno: "শোনো", shono: "শোনো", pori: "পড়ি", pora: "পড়া",
+  khawa: "খাওয়া", chai: "চাই", dao: "দাও", janina: "জানি না",
   // describing
-  bhalo: "ভালো", valo: "ভালো", kharap: "খারাপ", shundor: "সুন্দর", sundor: "সুন্দর", boro: "বড়",
-  choto: "ছোট", notun: "নতুন", purono: "পুরোনো", onek: "অনেক", olpo: "অল্প", shudhu: "শুধু",
-  aro: "আরও", ar: "আর", o: "ও", kintu: "কিন্তু", jodi: "যদি", tahole: "তাহলে", karon: "কারণ", tai: "তাই",
+  bhalo: "ভালো", valo: "ভালো", shundor: "সুন্দর", boro: "বড়",
+  choto: "ছোট", purono: "পুরোনো",
+  aro: "আরও", o: "ও", jodi: "যদি", karon: "কারণ",
   shotti: "সত্যি", sotti: "সত্যি", mittha: "মিথ্যা",
   // feelings
-  bhalobashi: "ভালোবাসি", valobashi: "ভালোবাসি", bhalobasha: "ভালোবাসা", prem: "প্রেম", mon: "মন",
-  mone: "মনে", hridoy: "হৃদয়", khushi: "খুশি", dukkho: "দুঃখ",
+  bhalobashi: "ভালোবাসি", valobashi: "ভালোবাসি", bhalobasha: "ভালোবাসা",
+  hridoy: "হৃদয়", dukkho: "দুঃখ",
   // politeness
-  dhonnobad: "ধন্যবাদ", donnobad: "ধন্যবাদ", shuvo: "শুভ", shubho: "শুভ", subho: "শুভ",
-  nomoskar: "নমস্কার", shagotom: "স্বাগতম", swagotom: "স্বাগতম", dukkhito: "দুঃখিত", maf: "মাফ",
-  jonmodin: "জন্মদিন", obhinondon: "অভিনন্দন",
+  dhonnobad: "ধন্যবাদ", donnobad: "ধন্যবাদ", subho: "শুভ",
+  shagotom: "স্বাগতম", dukkhito: "দুঃখিত",
   // family and places
-  ma: "মা", baba: "বাবা", bhai: "ভাই", vai: "ভাই", bon: "বোন", bondhu: "বন্ধু", chele: "ছেলে",
-  meye: "মেয়ে", manush: "মানুষ", bari: "বাড়ি", ghor: "ঘর", desh: "দেশ", gram: "গ্রাম",
-  shohor: "শহর", rasta: "রাস্তা", school: "স্কুল", kolej: "কলেজ", office: "অফিস", dokan: "দোকান",
-  bazar: "বাজার", bangla: "বাংলা", bangladesh: "বাংলাদেশ", bangali: "বাঙালি",
-  dhaka: "ঢাকা", chottogram: "চট্টগ্রাম", chittagong: "চট্টগ্রাম", sylhet: "সিলেট", khulna: "খুলনা",
-  rajshahi: "রাজশাহী", barishal: "বরিশাল", rongpur: "রংপুর",
+  bon: "বোন",
+  manush: "মানুষ", bari: "বাড়ি",
+  school: "স্কুল", office: "অফিস", dokan: "দোকান",
+  bazar: "বাজার",
+  dhaka: "ঢাকা", chottogram: "চট্টগ্রাম", chittagong: "চট্টগ্রাম", sylhet: "সিলেট",
+  rajshahi: "রাজশাহী", barishal: "বরিশাল",
   // food and things
-  pani: "পানি", jol: "জল", bhat: "ভাত", khabar: "খাবার", cha: "চা", dudh: "দুধ", mach: "মাছ",
-  mangsho: "মাংস", boi: "বই", kolom: "কলম", kagoj: "কাগজ", kaj: "কাজ", gan: "গান", chobi: "ছবি",
-  khela: "খেলা", porikkha: "পরীক্ষা", nam: "নাম", kotha: "কথা", proshno: "প্রশ্ন", prosno: "প্রশ্ন", uttor: "উত্তর",
-  bishwas: "বিশ্বাস", biswas: "বিশ্বাস", shikkha: "শিক্ষা",
+  cha: "চা",
+  mangsho: "মাংস",
+  porikkha: "পরীক্ষা", prosno: "প্রশ্ন",
+  biswas: "বিশ্বাস",
   // everyday English loanwords
   computer: "কম্পিউটার", mobile: "মোবাইল", phone: "ফোন", internet: "ইন্টারনেট", email: "ইমেইল",
   facebook: "ফেসবুক", message: "মেসেজ", class: "ক্লাস", bus: "বাস", taka: "টাকা",
   // numbers
-  ek: "এক", dui: "দুই", tin: "তিন", char: "চার", pach: "পাঁচ", choy: "ছয়", shat: "সাত",
-  at: "আট", noy: "নয়", dosh: "দশ",
+  char: "চার", pach: "পাঁচ", shat: "সাত",
+  at: "আট",
 };
 
 /* ---------- Suggestions ---------- */
