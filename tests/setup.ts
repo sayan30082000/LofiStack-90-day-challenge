@@ -24,6 +24,7 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 }
 
 if (!Element.prototype.scrollTo) Element.prototype.scrollTo = () => {};
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
 
 afterEach(() => {
   cleanup();

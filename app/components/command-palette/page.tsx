@@ -4,7 +4,8 @@ import { DemoAppPalette, LoadingPalette } from "./demos";
 
 export const metadata: Metadata = {
   title: "Command Palette",
-  description: "Cmd/Ctrl+K launcher with fuzzy search, highlighted matches, recent commands, nested pages and async commands.",
+  description:
+    "A Cmd/Ctrl+K palette that takes values inline (\"accent pink\", \"zoom 125\"), learns which result you pick for each search, and teaches you a command's keyboard shortcut once you keep reaching for it.",
 };
 
 const demoAppCode = `
@@ -23,13 +24,34 @@ const commands: CommandItem[] = [
     group: "Theme",
     label: "Change accent color",
     icon: <Palette />,
-    // children open as a nested page; Backspace on an empty search goes back
-    children: ["Indigo", "Violet", "Emerald", "Rose", "Amber"].map((name) => ({
-      id: \`accent-\${name}\`,
-      group: "Accent color",
-      label: name,
-      onRun: () => setAccent(name),
-    })),
+    keywords: ["accent", "color"],
+    // Type "accent pink" (keywords count: pink → Rose) or pick it in a second step
+    arg: {
+      kind: "choice",
+      name: "color",
+      options: [
+        { value: "indigo", label: "Indigo", keywords: ["blue"] },
+        { value: "rose", label: "Rose", keywords: ["pink", "red"] },
+        // …
+      ],
+    },
+    onRun: (value) => setAccent(value as Accent),
+  },
+  {
+    id: "zoom",
+    group: "Theme",
+    label: "Zoom text",
+    keywords: ["zoom", "font", "size"],
+    // "zoom 125" or "font 90%"; out of range shows "Enter a number from 80 to 150%"
+    arg: { kind: "number", name: "zoom level", min: 80, max: 150, unit: "%" },
+    onRun: (value) => setZoom(value as number),
+  },
+  {
+    id: "rename",
+    group: "Actions",
+    label: "Rename this page",
+    arg: { kind: "text", name: "title", validate: (v) => (v.length > 60 ? "Keep the title under 60 characters" : null) },
+    onRun: (value) => setTitle(String(value)),
   },
 ];
 
@@ -39,6 +61,8 @@ const commands: CommandItem[] = [
   onOpenChange={setOpen}
   defaultRecent={["go-props"]}
   portal={false} // inherit this demo's own light/dark class
+  // learn (default): picks per search are remembered in localStorage
+  // tipAfter={3} (default): after 3 runs of "Toggle dark mode", it shows ⇧ D once
 />`;
 
 const loadingCode = `
@@ -58,6 +82,7 @@ const [loading, setLoading] = useState(false);
   hotkey="/"            // Ctrl or Cmd + /
   loading={loading}
   maxRecent={0}
+  storageKey={null}     // learn for this page view only
   triggerLabel="Jump to a project…"
   emptyText={(q) => \`Nothing called “\${q}”. Try “mob” or “docs”.\`}
 />`;
@@ -80,9 +105,9 @@ export default function Page() {
       slug="command-palette"
       examples={[
         {
-          title: "Commands that change this page",
+          title: "Commands that take values, and learn",
           description:
-            "Press Ctrl+K or ⌘K. Scroll to the sections below, copy a link, toggle the demo's theme, or open the accent color sub-page. One command fails on purpose and one is disabled.",
+            "Press Ctrl+K or ⌘K and type a command with its value: “accent pink”, “zoom 125”, “rename Hello”. Choose a command without a value and it asks for one. Pick the same result for a search twice and it ranks first next time; run “Toggle dark mode” 3 times and the palette shows you its shortcut.",
           preview: <DemoAppPalette />,
           code: demoAppCode,
           minHeight: 320,
@@ -116,6 +141,12 @@ export default function Page() {
         { name: "backLabel / closeLabel", type: "string", default: '"Back" / "Close"', description: "Accessible labels of the back and close buttons." },
         { name: "showFooter", type: "boolean", default: "true", description: "Keyboard hint footer, hidden on small screens." },
         { name: "portal", type: "boolean", default: "true", description: "Render into document.body. Turn off to inherit theme classes from the surrounding markup." },
+        { name: "learn", type: "boolean", default: "true", description: "Rank a command higher for a search it was picked for before (and for longer or shorter versions of that search)." },
+        { name: "tipAfter", type: "number", default: "3", description: "After a command with a shortcut has run this many times from the palette, show its shortcut once as a tip. 0 turns tips off." },
+        { name: "storageKey", type: "string | null", default: '"lofi-command-palette"', description: "localStorage key for what the palette learned. null keeps it for this page view only." },
+        { name: "quickRunLabel", type: "string", default: '"Run with this value"', description: "Heading of inline matches like “accent pink”." },
+        { name: "learnedLabel", type: "string", default: '"Your usual pick"', description: "Badge on the top result when learning put it there." },
+        { name: "tipText / tipDismissLabel", type: "(label, runs) => string / string", description: "Wording of the shortcut tip and its dismiss button." },
       ]}
       types={[
         {
@@ -128,7 +159,8 @@ export default function Page() {
             { name: "description", type: "string", description: "Muted text after the label." },
             { name: "shortcut", type: "string[]", description: "Key hints on the right. Display only." },
             { name: "keywords", type: "string[]", description: "Extra terms that also match, without highlighting." },
-            { name: "onRun", type: "() => void | Promise<unknown>", description: "Runs the command, then the palette closes. A promise shows a spinner; a rejection shows its message." },
+            { name: "onRun", type: "(value?) => void | Promise<unknown>", description: "Runs the command (with the parsed value when it has an arg), then the palette closes. A promise shows a spinner; a rejection shows its message." },
+            { name: "arg", type: "CommandArg", description: "A value the command takes: { kind: \"choice\", options } | { kind: \"number\", min, max, unit } | { kind: \"text\", validate }. Typed inline after the command, or asked for in a second step." },
             { name: "children", type: "CommandItem[]", description: "Opens a nested page instead of running. Searching from a parent page also finds nested commands." },
             { name: "disabled", type: "boolean", description: "Listed, but skipped by arrow keys and can't run." },
             { name: "keepOpen", type: "boolean", description: "Stay open after running." },
@@ -141,6 +173,8 @@ export default function Page() {
         "Rows are role=\"option\" inside labelled role=\"group\" sections, with aria-selected on the active row and aria-disabled on disabled ones.",
         "Up/Down move (wrapping, skipping disabled rows), Enter runs, Esc closes, Backspace on an empty search goes back a page. The trigger exposes the shortcut with aria-keyshortcuts.",
         "A polite status region announces the number of results, the empty message or the loading text; command errors use role=\"alert\".",
+        "In the value step the search box is renamed (“Zoom text: zoom level”), number values open the decimal keyboard on phones, and an invalid value is shown and announced as the empty message (“Enter a number from 80 to 150%”).",
+        "The shortcut tip is a visible note with a real dismiss button, and its sentence is also read out with the result count when the palette opens.",
         "A visible 40px close button and backdrop tap close it on touch devices. Open, page and highlight animations are removed with prefers-reduced-motion.",
       ]}
     />

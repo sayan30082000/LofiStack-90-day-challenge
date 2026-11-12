@@ -1,11 +1,27 @@
 import type { Metadata } from "next";
 import { ComponentPage } from "@/components/gallery/ComponentPage";
-import { TechStackDemo, TrustedByDemo, VerticalDemo } from "./demos";
+import { OpticalDemo, TechStackDemo, TrustedByDemo, VerticalDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "Logo Marquee",
-  description: "Infinite scrolling logo strip with edge fades, grayscale-to-color hover, multiple rows and a vertical variant.",
+  description:
+    "A logo strip where every logo looks the same size: it measures each logo's ink and sizes wide, tall, thin and heavy logos to match. Rows move at the same pixel speed, and you can drag them.",
 };
+
+const opticalCode = `
+// Logos with very different shapes: a square icon, a 440×40 wordmark,
+// a heavy block, a file with lots of empty padding, a tall stacked logo…
+<LogoMarquee
+  items={logos}
+  normalize        // default: measure each logo and size it optically
+  logoHeight={28}  // the height a typical 3:1 wordmark gets
+  gap={56}
+  label="Customer logos"
+/>
+
+// The maths is exported and pure:
+analyzeLogoPixels(rgba, width, height) // → { x, y, width, height, density } of the ink
+opticalLogoHeight(inkAspect, density, 28) // → height for this logo's ink, in px`;
 
 const trustedCode = `
 const logos: LogoMarqueeItem[] = [
@@ -72,6 +88,14 @@ export default function Page() {
       slug="logo-marquee"
       examples={[
         {
+          title: "Logos that look the same size",
+          description:
+            "Six logos with very different shapes. Switch optical sizing off to see the usual result: equal heights make the wide wordmark shout and the padded file look tiny. Drag the strip to scrub through it.",
+          preview: <OpticalDemo />,
+          code: opticalCode,
+          minHeight: 220,
+        },
+        {
           title: "Trusted by",
           description:
             "Fictional SVG wordmarks with light and dark versions. Grayscale until hovered, faded edges, paused on hover or with the button.",
@@ -97,15 +121,18 @@ export default function Page() {
       usage={usage}
       props={[
         { name: "items", type: "LogoMarqueeItem[]", description: "Logos to scroll. Split across rows, in order, when rows > 1." },
-        { name: "speed", type: "number", default: "30", description: "Seconds per loop. Higher is slower." },
+        { name: "pxPerSecond", type: "number", default: "40", description: "Speed in pixels per second. Every row moves at this speed, however many logos it has." },
+        { name: "speed", type: "number", description: "Seconds per loop instead of pxPerSecond. Rows of different lengths then move at different speeds." },
         { name: "direction", type: '"left" | "right" | "up" | "down"', default: '"left"', description: "Direction of the first row. up and down make it vertical." },
         { name: "pauseOnHover", type: "boolean", default: "true", description: "Pause while hovered. Keyboard focus on a link inside always pauses." },
+        { name: "draggable", type: "boolean", default: "true", description: "Grab a row and drag to scrub through it. A drag that ends on a link doesn't open it." },
         { name: "fade", type: "boolean", default: "true", description: "Mask the edges so logos fade in and out." },
         { name: "fadeSize", type: "number", default: "64", description: "Size of each edge fade, in px." },
         { name: "gap", type: "number", default: "48", description: "Space between logos, in px. Rows are gap / 2 apart." },
         { name: "rows", type: "number", default: "1", description: "Number of rows (columns when vertical). Every other row is reversed." },
-        { name: "grayscale", type: "boolean", default: "true", description: "Grayscale and dimmed until hovered or focused." },
-        { name: "logoHeight", type: "number", default: "28", description: "Height of image logos, in px." },
+        { name: "grayscale", type: "boolean", default: "true", description: "Grayscale until hovered or focused." },
+        { name: "logoHeight", type: "number", default: "28", description: "Height of image logos, in px. With normalize, the height a typical 3:1 wordmark gets." },
+        { name: "normalize", type: "boolean", default: "true", description: "Optical sizing: trim each image logo's empty padding, then size its ink by shape (1/√aspect) and weight (density) so all logos look equally big." },
         { name: "height", type: "number", default: "320", description: "Height of the marquee when vertical, in px." },
         { name: "title", type: "ReactNode", description: "Heading above the strip. Also names the region." },
         { name: "label", type: "string", default: '"Logos"', description: "Accessible name of the region when there is no title." },
@@ -119,7 +146,7 @@ export default function Page() {
           name: "LogoMarqueeItem",
           props: [
             { name: "src", type: "string", description: "Image URL." },
-            { name: "srcDark", type: "string", description: "Image URL used in dark mode." },
+            { name: "srcDark", type: "string", description: "Image URL used in dark mode. Sized like src." },
             { name: "alt", type: "string", description: "Alt text, or the visible text fallback when there is no src or node. Required." },
             { name: "href", type: "string", description: "Makes the logo a link with a 40px target." },
             { name: "node", type: "ReactNode", description: "Custom content instead of an image." },
@@ -132,6 +159,8 @@ export default function Page() {
         "A 40px pause / play button stops the motion for keyboard and touch users (WCAG 2.2.2). Hover and focus inside also pause it.",
         "With prefers-reduced-motion the animation stops, the duplicate set and the control are removed, and logos wrap into a static centered grid.",
         "Image logos need alt text; links show a visible focus ring and bring the logo back to full color.",
+        "Dragging is an extra, never the only way: the pause button does the same job without a pointer, and a drag never opens a link by accident.",
+        "Optical sizing only changes image sizes; nothing is announced differently, and logos without readable pixels (cross-origin images without CORS) fall back to their outer shape.",
       ]}
     />
   );

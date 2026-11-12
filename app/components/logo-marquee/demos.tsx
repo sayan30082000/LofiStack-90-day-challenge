@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Atom,
@@ -36,6 +37,55 @@ const LOGOS: LogoMarqueeItem[] = BRANDS.map(([slug, name]) => ({
   alt: name,
 }));
 
+/* ---------- Optical sizing ---------- */
+
+/* Six fictional logos with very different shapes: a square icon, a very wide thin wordmark, a heavy
+   block, a file with lots of empty padding, a thin outline mark and a tall stacked logo. */
+const MIXED: LogoMarqueeItem[] = (
+  [
+    ["pebl", "Pebl"],
+    ["northwind", "Northwind Analytics"],
+    ["krag", "Krag"],
+    ["sproutly", "Sproutly"],
+    ["halo", "Halo"],
+    ["tessera", "Tessera"],
+  ] as const
+).map(([slug, name]) => ({
+  src: `/demo/logo-marquee/mixed/${slug}.svg`,
+  srcDark: `/demo/logo-marquee/mixed/${slug}-dark.svg`,
+  alt: name,
+}));
+
+export function OpticalDemo() {
+  const [optical, setOptical] = useState(true);
+  return (
+    <div className="flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-zinc-200 bg-white px-4 py-6 sm:px-8 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          aria-pressed={optical}
+          onClick={() => setOptical((o) => !o)}
+          className="inline-flex h-10 items-center gap-2 rounded-full border border-zinc-200 bg-white pl-1.5 pr-4 text-sm font-medium text-zinc-800 outline-none hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          <span
+            aria-hidden
+            className={`relative h-6 w-10 rounded-full transition-colors motion-reduce:transition-none ${optical ? "bg-indigo-600" : "bg-zinc-300 dark:bg-zinc-600"}`}
+          >
+            <span
+              className={`absolute top-1 size-4 rounded-full bg-white shadow transition-[left] motion-reduce:transition-none ${optical ? "left-5" : "left-1"}`}
+            />
+          </span>
+          Optical sizing
+        </button>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {optical ? "Each logo is measured and sized to look as big as the others." : "Every logo gets the same height: the wide one shouts, the padded one shrinks."}
+        </p>
+      </div>
+      <LogoMarquee items={MIXED} normalize={optical} gap={56} label="Customer logos" />
+    </div>
+  );
+}
+
 export function TrustedByDemo() {
   return (
     <div className="w-full max-w-4xl rounded-2xl border border-zinc-200 bg-white px-4 py-6 sm:px-8 dark:border-zinc-800 dark:bg-zinc-950">
@@ -46,7 +96,6 @@ export function TrustedByDemo() {
             Trusted by product teams at
           </p>
         }
-        speed={36}
         gap={56}
       />
     </div>
@@ -87,7 +136,7 @@ export function TechStackDemo() {
         items={STACK_ITEMS}
         rows={2}
         gap={12}
-        speed={40}
+        pxPerSecond={36}
         grayscale={false}
         fadeSize={96}
         label="Tech stack"
@@ -120,7 +169,7 @@ export function VerticalDemo() {
           rows={2}
           height={280}
           gap={36}
-          speed={24}
+          pxPerSecond={30}
           logoHeight={24}
           label="Customer logos"
         />

@@ -13,8 +13,28 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, CircleAlert, CornerDownLeft, Loader2, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleAlert, CornerDownLeft, Lightbulb, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/** One value a "choice" argument can take. */
+export interface CommandChoice {
+  value: string;
+  label: string;
+  /** Other words that pick this value, e.g. ["green"] for "Emerald". */
+  keywords?: string[];
+  icon?: ReactNode;
+}
+
+/**
+ * A value the command needs. It can be typed straight after the command ("accent teal",
+ * "zoom 125") or picked in a second step after choosing the command.
+ */
+export type CommandArg =
+  | { kind: "choice"; name: string; options: CommandChoice[]; placeholder?: string }
+  | { kind: "number"; name: string; min?: number; max?: number; unit?: string; placeholder?: string }
+  | { kind: "text"; name: string; placeholder?: string; validate?: (value: string) => string | null };
+
+export type CommandValue = string | number;
 
 export interface CommandItem {
   /** Unique id across the whole tree (used for recents and keys). */
@@ -29,8 +49,13 @@ export interface CommandItem {
   shortcut?: string[];
   /** Extra search terms that also match this command. */
   keywords?: string[];
-  /** Runs the command. Return a promise to show a spinner; a rejection shows its message in the palette. */
-  onRun?: () => void | Promise<unknown>;
+  /**
+   * Runs the command. Commands with an `arg` receive the parsed value. Return a promise to show
+   * a spinner; a rejection shows its message in the palette.
+   */
+  onRun?: (value?: CommandValue) => void | Promise<unknown>;
+  /** A value the command takes, typed inline ("accent teal") or picked in a second step. */
+  arg?: CommandArg;
   /** Sub-commands. Running this command opens them as a nested page. */
   children?: CommandItem[];
   /** Listed but can't be run, and skipped by the arrow keys. */
@@ -77,6 +102,23 @@ export interface CommandPaletteProps {
   showFooter?: boolean;
   /** Portal the dialog to document.body. Turn off to inherit theme classes from where the palette is rendered. */
   portal?: boolean;
+  /**
+   * Learn from what people pick: a command chosen for a search ranks higher the next time that
+   * search (or a longer or shorter version of it) is typed.
+   */
+  learn?: boolean;
+  /** After a command with a `shortcut` has run from the palette this many times, show its shortcut once as a tip. 0 turns tips off. */
+  tipAfter?: number;
+  /** localStorage key that keeps what the palette learned between visits. null keeps it for this page view only. */
+  storageKey?: string | null;
+  /** Heading of the section with commands whose value was typed inline. */
+  quickRunLabel?: string;
+  /** Badge on the top result when it ranks first because it was picked for this search before. */
+  learnedLabel?: string;
+  /** Tip text shown before the shortcut keys. */
+  tipText?: (label: string, runs: number) => string;
+  /** Label of the button that dismisses the tip. */
+  tipDismissLabel?: string;
 }
 
 /* ---------- Helpers ---------- */
@@ -131,6 +173,133 @@ export function fuzzyMatch(text: string, query: string): Match | null {
   if (qi < chars.length) return null;
   score -= (indices[indices.length - 1] - indices[0] - indices.length) * 0.4;
   return { score, indices };
+}
+
+export type ArgResult = { ok: true; value: CommandValue; display: string } | { ok: false; error: string };
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Reads a typed value for an argument. null when nothing has been typed yet. */
+export function parseArgument(arg: CommandArg, text: string): ArgResult | null {
+  const t = text.trim();
+  if (!t) return null;
+  if (arg.kind === "choice") {
+    let best: { option: CommandChoice; score: number } | null = null;
+    for (const option of arg.options) {
+      for (const s of [option.label, option.value, ...(option.keywords ?? [])]) {
+        const m = fuzzyMatch(s, t);
+        if (m && (!best || m.score > best.score)) best = { option, score: m.score };
+      }
+    }
+    return best ? { ok: true, value: best.option.value, display: best.option.label } : { ok: false, error: `No ${arg.name} matches “${t}”` };
+  }
+  if (arg.kind === "number") {
+    const unit = arg.unit ?? "";
+    const m = t.replace(/,/g, "").match(new RegExp(`^([-+]?\\d*\\.?\\d+)\\s*(${unit ? escapeRegExp(unit.trim()) : ""})?$`, "i"));
+    if (!m) return { ok: false, error: `“${t}” isn't a number` };
+    const n = Number(m[1]);
+    if ((arg.min !== undefined && n < arg.min) || (arg.max !== undefined && n > arg.max)) {
+      const error =
+        arg.min !== undefined && arg.max !== undefined
+          ? `Enter a number from ${arg.min} to ${arg.max}${unit}`
+          : arg.min !== undefined
+            ? `Enter ${arg.min}${unit} or more`
+            : `Enter ${arg.max}${unit} or less`;
+      return { ok: false, error };
+    }
+    return { ok: true, value: n, display: `${n}${unit}` };
+  }
+  const error = arg.validate?.(t) ?? null;
+  return error ? { ok: false, error } : { ok: true, value: t, display: t };
+}
+
+/**
+ * Splits a search like "accent teal" into a command and its value: the leading words must
+ * appear in the label or a keyword, and the rest must be a valid value. Returns the best split.
+ */
+export function matchWithArgument(cmd: CommandItem, query: string): { value: CommandValue; display: string; score: number } | null {
+  if (!cmd.arg || cmd.disabled) return null;
+  const words = query.trim().split(/\s+/);
+  let best: { value: CommandValue; display: string; score: number } | null = null;
+  for (let k = 1; k < words.length; k++) {
+    const head = words.slice(0, k).join(" ").toLowerCase();
+    const headScore = Math.max(
+      ...[cmd.label, ...(cmd.keywords ?? [])].map((s) => (s.toLowerCase().includes(head) ? (fuzzyMatch(s, head)?.score ?? 0) : -Infinity)),
+    );
+    if (headScore === -Infinity) continue;
+    const parsed = parseArgument(cmd.arg, words.slice(k).join(" "));
+    if (parsed?.ok && (!best || headScore > best.score)) best = { value: parsed.value, display: parsed.display, score: headScore };
+  }
+  return best;
+}
+
+/* ---------- Learning ---------- */
+
+/** What the palette has learned: which command was picked for which search, and how often each ran. */
+export interface PaletteMemory {
+  picks: Record<string, Record<string, number>>;
+  runs: Record<string, number>;
+  /** Commands whose shortcut tip has been shown. */
+  tipped: string[];
+}
+
+export const emptyPaletteMemory = (): PaletteMemory => ({ picks: {}, runs: {}, tipped: [] });
+const normalizeQuery = (q: string) => q.trim().toLowerCase().replace(/\s+/g, " ");
+const MAX_QUERIES = 100;
+
+/** Records that `id` ran after searching `query` (pure). Keeps the 100 most recent searches. */
+export function rememberRun(memory: PaletteMemory, query: string, id: string): PaletteMemory {
+  const q = normalizeQuery(query);
+  let picks = memory.picks;
+  if (q) {
+    const { [q]: prev = {}, ...rest } = memory.picks;
+    const entries = Object.entries({ ...rest, [q]: { ...prev, [id]: (prev[id] ?? 0) + 1 } });
+    picks = Object.fromEntries(entries.slice(-MAX_QUERIES));
+  }
+  return { ...memory, picks, runs: { ...memory.runs, [id]: (memory.runs[id] ?? 0) + 1 } };
+}
+
+/**
+ * Extra ranking score for `id` on `query`: 40 per earlier pick of the exact search, 20 per pick
+ * of a longer or shorter version of it ("th" and "the" help each other), capped at 160.
+ */
+export function learnedBoost(memory: PaletteMemory, query: string, id: string): number {
+  const q = normalizeQuery(query);
+  if (!q) return 0;
+  let boost = 0;
+  for (const [s, counts] of Object.entries(memory.picks)) {
+    const c = counts[id];
+    if (!c) continue;
+    if (s === q) boost += c * 40;
+    else if (s.startsWith(q) || q.startsWith(s)) boost += c * 20;
+  }
+  return Math.min(boost, 160);
+}
+
+// Without a storageKey, memory lasts for this page view only.
+const sessionMemory = new Map<string, PaletteMemory>();
+
+function loadMemory(key: string | null, sessionKey: string): PaletteMemory {
+  if (!key) return sessionMemory.get(sessionKey) ?? emptyPaletteMemory();
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) ?? "null");
+    if (raw && typeof raw.picks === "object" && typeof raw.runs === "object" && Array.isArray(raw.tipped)) return raw as PaletteMemory;
+  } catch {
+    // Blocked or corrupt storage: start fresh.
+  }
+  return emptyPaletteMemory();
+}
+
+function saveMemory(key: string | null, sessionKey: string, memory: PaletteMemory) {
+  if (!key) {
+    sessionMemory.set(sessionKey, memory);
+    return;
+  }
+  try {
+    localStorage.setItem(key, JSON.stringify(memory));
+  } catch {
+    // Storage full or blocked: learning still works for this visit.
+  }
 }
 
 function Highlight({ text, indices }: { text: string; indices: number[] }) {
@@ -217,9 +386,17 @@ export function CommandPalette({
   closeLabel = "Close",
   showFooter = true,
   portal = true,
+  learn = true,
+  tipAfter = 3,
+  storageKey = "lofi-command-palette",
+  quickRunLabel = "Run with this value",
+  learnedLabel = "Your usual pick",
+  tipText = (label, runs) => `You've run “${label}” from here ${runs} times. Next time, press`,
+  tipDismissLabel = "Got it",
 }: CommandPaletteProps) {
   const [isOpen, setOpen] = useControllable(open, defaultOpen, onOpenChange);
   const [recent, setRecent] = useState<string[]>(() => defaultRecent.slice(0, maxRecent));
+  const sessionKey = useId();
   const isClient = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const isMac = useSyncExternalStore(
     subscribeNoop,
@@ -256,8 +433,17 @@ export function CommandPalette({
         backLabel={backLabel}
         closeLabel={closeLabel}
         showFooter={showFooter}
-        onRecord={(cmd) => {
+        learn={learn}
+        tipAfter={tipAfter}
+        quickRunLabel={quickRunLabel}
+        learnedLabel={learnedLabel}
+        tipText={tipText}
+        tipDismissLabel={tipDismissLabel}
+        storageKey={storageKey}
+        sessionKey={sessionKey}
+        onRecord={(cmd, search) => {
           if (maxRecent > 0) setRecent((r) => [cmd.id, ...r.filter((id) => id !== cmd.id)].slice(0, maxRecent));
+          saveMemory(storageKey, sessionKey, rememberRun(loadMemory(storageKey, sessionKey), search, cmd.id));
         }}
         onClose={() => setOpen(false)}
       />
@@ -302,6 +488,16 @@ interface Option {
   /** Ancestors between the current page and this command, for nested matches and recents. */
   path: CommandItem[];
   indices: number[];
+  /** Value to run the command with (inline "accent teal", or a pick in the value step). */
+  value?: CommandValue;
+  /** Value shown as a chip after the label, for inline matches. */
+  chip?: string;
+  /** Text shown instead of the command label, in the value step. */
+  display?: string;
+  /** Icon shown instead of the command icon. */
+  icon?: ReactNode;
+  /** Ranked up because it was picked for this search before. */
+  learned?: boolean;
 }
 
 interface Section {
@@ -322,7 +518,16 @@ interface DialogProps {
   backLabel: string;
   closeLabel: string;
   showFooter: boolean;
-  onRecord: (cmd: CommandItem) => void;
+  learn: boolean;
+  tipAfter: number;
+  quickRunLabel: string;
+  learnedLabel: string;
+  tipText: (label: string, runs: number) => string;
+  tipDismissLabel: string;
+  storageKey: string | null;
+  sessionKey: string;
+  /** Called when a command runs, with the search that found it. */
+  onRecord: (cmd: CommandItem, search: string) => void;
   onClose: () => void;
 }
 
@@ -354,6 +559,14 @@ function PaletteDialog({
   backLabel,
   closeLabel,
   showFooter,
+  learn,
+  tipAfter,
+  quickRunLabel,
+  learnedLabel,
+  tipText,
+  tipDismissLabel,
+  storageKey,
+  sessionKey,
   onRecord,
   onClose,
 }: DialogProps) {
@@ -361,6 +574,25 @@ function PaletteDialog({
   const listId = `${uid}-list`;
   const [query, setQuery] = useState("");
   const [stack, setStack] = useState<CommandItem[]>([]);
+  /** The command whose value is being asked for, and the search that led to it (for learning). */
+  const [argStep, setArgStep] = useState<{ opt: Option; search: string } | null>(null);
+  // Ranking uses what was learned before this opening; runs in this opening count next time.
+  const [memory] = useState(() => loadMemory(storageKey, sessionKey));
+  // A shortcut tip, shown once per command: picked when the palette opens.
+  const [tip, setTip] = useState<{ cmd: CommandItem; runs: number } | null>(() => {
+    if (tipAfter <= 0) return null;
+    const hit = descendants(commands).find(
+      ({ cmd }) => cmd.shortcut?.length && !cmd.disabled && (memory.runs[cmd.id] ?? 0) >= tipAfter && !memory.tipped.includes(cmd.id),
+    );
+    return hit ? { cmd: hit.cmd, runs: memory.runs[hit.cmd.id] } : null;
+  });
+  const tipShown = useRef(false);
+  useEffect(() => {
+    if (!tip || tipShown.current) return;
+    tipShown.current = true;
+    const m = loadMemory(storageKey, sessionKey);
+    saveMemory(storageKey, sessionKey, { ...m, tipped: [...m.tipped, tip.cmd.id] });
+  }, [tip, storageKey, sessionKey]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [runningKey, setRunningKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -392,7 +624,39 @@ function PaletteDialog({
 
   const q = query.trim();
 
+  const argResult = useMemo(() => (argStep?.opt.cmd.arg ? parseArgument(argStep.opt.cmd.arg, q) : null), [argStep, q]);
+
   const sections = useMemo<Section[]>(() => {
+    // Value step: the options of a choice, or the typed value of a number/text argument.
+    if (argStep) {
+      const { cmd } = argStep.opt;
+      const arg = cmd.arg!;
+      if (arg.kind === "choice") {
+        const opts = arg.options
+          .map((o) => {
+            if (!q) return { o, score: 0, indices: [] as number[] };
+            const own = fuzzyMatch(o.label, q);
+            if (own) return { o, score: own.score, indices: own.indices };
+            const kw = [o.value, ...(o.keywords ?? [])].map((k) => fuzzyMatch(k, q)).find(Boolean);
+            return kw ? { o, score: kw.score * 0.6, indices: [] as number[] } : null;
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null)
+          .sort((a, b) => b.score - a.score);
+        return opts.length
+          ? [
+              {
+                key: "value",
+                label: cmd.label,
+                options: opts.map(({ o, indices }) => ({ key: `value:${o.value}`, cmd, path: [], indices, value: o.value, display: o.label, icon: o.icon })),
+              },
+            ]
+          : [];
+      }
+      return argResult?.ok
+        ? [{ key: "value", label: cmd.label, options: [{ key: "value", cmd, path: [], indices: [], value: argResult.value, display: `${cmd.label}: ${argResult.display}` }] }]
+        : [];
+    }
+
     const current = stack.length ? (stack[stack.length - 1].children ?? []) : commands;
     if (!q) {
       const out: Section[] = [];
@@ -407,21 +671,45 @@ function PaletteDialog({
       return [...out, ...groupInOrder(current.map((cmd) => ({ key: cmd.id, cmd, path: [], indices: [] })))];
     }
     // Search the current page and everything nested below it.
-    const scored = descendants(current)
+    const all = descendants(current);
+    const boost = (id: string) => (learn ? learnedBoost(memory, q, id) : 0);
+    const scored = all
       .map(({ cmd, path }) => {
         const hit = fuzzyMatch(cmd.label, q);
-        if (hit) return { cmd, path, indices: hit.indices, score: hit.score - path.length * 5 };
+        if (hit) return { cmd, path, indices: hit.indices, score: hit.score - path.length * 5 + boost(cmd.id), learned: boost(cmd.id) > 0 };
         const kw = [...(cmd.keywords ?? []), ...path.map((p) => p.label)]
           .map((k) => fuzzyMatch(k, q))
           .filter((m): m is Match => m !== null)
           .sort((a, b) => b.score - a.score)[0];
-        return kw ? { cmd, path, indices: [] as number[], score: kw.score * 0.6 - path.length * 5 } : null;
+        return kw
+          ? { cmd, path, indices: [] as number[], score: kw.score * 0.6 - path.length * 5 + boost(cmd.id), learned: boost(cmd.id) > 0 }
+          : null;
       })
       .filter((s): s is NonNullable<typeof s> => s !== null)
       .sort((a, b) => b.score - a.score);
-    // Groups follow their best match.
-    return groupInOrder(scored.map(({ cmd, path, indices }) => ({ key: cmd.id, cmd, path, indices })));
-  }, [q, stack, recentIds, commands, recentLabel]);
+    // "accent teal", "zoom 125": the command and its value in one go, listed first.
+    const inline = all
+      .map(({ cmd, path }) => {
+        const m = matchWithArgument(cmd, q);
+        return m ? { cmd, path, ...m, score: m.score + boost(cmd.id) } : null;
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null)
+      .sort((a, b) => b.score - a.score);
+    const quick: Section[] = inline.length
+      ? [
+          {
+            key: "quick",
+            label: quickRunLabel,
+            options: inline.map(({ cmd, path, value, display }) => ({ key: `quick:${cmd.id}`, cmd, path, indices: [], value, chip: display })),
+          },
+        ]
+      : [];
+    // Groups follow their best match. Only the top result shows the "learned" badge.
+    return [
+      ...quick,
+      ...groupInOrder(scored.map(({ cmd, path, indices, learned }, i) => ({ key: cmd.id, cmd, path, indices, learned: learned && i === 0 }))),
+    ];
+  }, [q, stack, recentIds, commands, recentLabel, argStep, argResult, learn, memory, quickRunLabel]);
 
   const flat = useMemo(() => sections.flatMap((s) => s.options), [sections]);
   const enabled = flat.filter((o) => !o.cmd.disabled);
@@ -458,6 +746,15 @@ function PaletteDialog({
   };
 
   const goBack = () => {
+    if (argStep) {
+      setArgStep(null);
+      setQuery(argStep.search);
+      setError(null);
+      setActiveKey(argStep.opt.key);
+      setPage((p) => ({ dir: "out", n: p.n + 1 }));
+      inputRef.current?.focus();
+      return;
+    }
     if (!stack.length) return;
     const parent = stack[stack.length - 1];
     setStack(stack.slice(0, -1));
@@ -480,25 +777,34 @@ function PaletteDialog({
       inputRef.current?.focus();
       return;
     }
-    onRecord(cmd);
+    // A command that needs a value and didn't get one inline: ask for it.
+    if (cmd.arg && opt.value === undefined) {
+      setArgStep({ opt, search: query });
+      setQuery("");
+      setActiveKey(null);
+      setPage((p) => ({ dir: "in", n: p.n + 1 }));
+      inputRef.current?.focus();
+      return;
+    }
+    onRecord(cmd, argStep ? argStep.search : query);
     let result: void | Promise<unknown>;
     try {
-      result = cmd.onRun?.();
+      result = cmd.onRun?.(opt.value);
     } catch (e) {
       setError(errorMessage(e));
       return;
     }
     if (result instanceof Promise) {
       setRunningKey(opt.key);
-      const flag = life.current;
+      // The dialog may have closed by the time the command settles.
       result.then(
         () => {
-          if (!flag.alive) return;
+          if (!life.current.alive) return;
           setRunningKey(null);
           if (!cmd.keepOpen) onClose();
         },
         (e: unknown) => {
-          if (!flag.alive) return;
+          if (!life.current.alive) return;
           setRunningKey(null);
           setError(errorMessage(e));
         },
@@ -508,7 +814,7 @@ function PaletteDialog({
     }
   };
 
-  const onInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+  const onInputKeyDown = (e: ReactKeyboardEvent<HTMLElement>) => {
     if (e.nativeEvent.isComposing) return;
     switch (e.key) {
       case "ArrowDown":
@@ -524,7 +830,7 @@ function PaletteDialog({
         if (active && !loading) run(active);
         break;
       case "Backspace":
-        if (query === "" && stack.length) {
+        if (query === "" && (stack.length || argStep)) {
           e.preventDefault();
           goBack();
         }
@@ -556,12 +862,21 @@ function PaletteDialog({
     }
   };
 
-  const pageLabel = stack[stack.length - 1]?.label;
+  const arg = argStep?.opt.cmd.arg;
+  const pageLabel = argStep ? argStep.opt.cmd.label : stack[stack.length - 1]?.label;
+  const backTo = argStep ? (stack[stack.length - 1]?.label ?? null) : stack.length > 1 ? stack[stack.length - 2].label : null;
+  const emptyMessage = arg
+    ? argResult && !argResult.ok
+      ? argResult.error
+      : (arg.placeholder ?? `Type a ${arg.name}`)
+    : emptyText(q);
+  const showTip = tip && !q && !stack.length && !argStep && !loading;
+  const tipSentence = tip ? `${tipText(tip.cmd.label, tip.runs)} ${tip.cmd.shortcut!.join(" ")}.` : "";
   const status = loading
     ? loadingText
     : flat.length === 0
-      ? emptyText(q)
-      : `${enabled.length} command${enabled.length === 1 ? "" : "s"}${pageLabel ? ` in ${pageLabel}` : ""}`;
+      ? emptyMessage
+      : `${showTip ? `${tipSentence} ` : ""}${enabled.length} ${argStep ? "option" : "command"}${enabled.length === 1 ? "" : "s"}${pageLabel ? ` in ${pageLabel}` : ""}`;
 
   return (
     <div
@@ -583,12 +898,12 @@ function PaletteDialog({
       >
         {/* Search row */}
         <div className="flex h-14 shrink-0 items-center gap-1.5 border-b border-zinc-200 pl-2 pr-2 transition-colors focus-within:border-indigo-400 motion-reduce:transition-none dark:border-zinc-800 dark:focus-within:border-indigo-500/70">
-          {stack.length ? (
+          {stack.length || argStep ? (
             <>
               <button
                 type="button"
                 onClick={goBack}
-                aria-label={`${backLabel}${stack.length > 1 ? ` to ${stack[stack.length - 2].label}` : ""}`}
+                aria-label={`${backLabel}${backTo ? ` to ${backTo}` : ""}`}
                 className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-zinc-500 outline-none hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-2 focus-visible:outline-indigo-500 active:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:active:bg-zinc-700"
               >
                 <ChevronLeft className="size-4" aria-hidden />
@@ -609,7 +924,8 @@ function PaletteDialog({
             aria-controls={listId}
             aria-autocomplete="list"
             aria-activedescendant={activeDomId}
-            aria-label={pageLabel ? `Search ${pageLabel}` : "Search commands"}
+            aria-label={arg ? `${pageLabel}: ${arg.name}` : pageLabel ? `Search ${pageLabel}` : "Search commands"}
+            inputMode={arg?.kind === "number" ? "decimal" : undefined}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -617,7 +933,7 @@ function PaletteDialog({
               setError(null);
             }}
             onKeyDown={onInputKeyDown}
-            placeholder={pageLabel ? `Search ${pageLabel.toLowerCase()}…` : placeholder}
+            placeholder={arg ? `${arg.placeholder ?? `Type a ${arg.name}`}…` : pageLabel ? `Search ${pageLabel.toLowerCase()}…` : placeholder}
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
@@ -626,9 +942,11 @@ function PaletteDialog({
           <button
             type="button"
             onClick={onClose}
-            aria-label={closeLabel}
+
             className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg px-2 outline-none hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-indigo-500 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700"
           >
+            {/* Named "Close Esc": the visible key stays part of the name (WCAG 2.5.3). */}
+            <span className="sr-only">{closeLabel} </span>
             <Kbd>Esc</Kbd>
           </button>
         </div>
@@ -643,13 +961,47 @@ function PaletteDialog({
           </div>
         )}
 
+        {showTip && (
+          <div className="mx-2 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+            <Lightbulb className="size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
+            <span className="min-w-0 flex-1">
+              {tipText(tip.cmd.label, tip.runs)}{" "}
+              <span className="inline-flex gap-1 align-middle">
+                {tip.cmd.shortcut!.map((k, i) => (
+                  <Kbd key={i}>{k}</Kbd>
+                ))}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setTip(null);
+                inputRef.current?.focus();
+              }}
+              className="inline-flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-semibold text-amber-900 outline-none hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-indigo-500 dark:text-amber-100 dark:hover:bg-amber-400/15"
+            >
+              {tipDismissLabel}
+            </button>
+          </div>
+        )}
+
         {/* Results */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 [max-height:min(24rem,60vh)]">
+        <div
+          // Long lists scroll: keep the area reachable with Tab, where the arrow keys still move.
+          tabIndex={0}
+          role="region"
+          aria-label={`${pageLabel ?? label} results`}
+          onKeyDown={(e) => {
+            if (e.target === e.currentTarget && ["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) onInputKeyDown(e);
+          }}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-b-2xl p-2 outline-none [max-height:min(24rem,60vh)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+        >
           <div
             key={page.n}
             id={listId}
-            role="listbox"
-            aria-label={pageLabel ?? label}
+            // An empty listbox is invalid: with nothing to list, the message is plain text.
+            role={loading || flat.length > 0 ? "listbox" : undefined}
+            aria-label={loading || flat.length > 0 ? (pageLabel ?? label) : undefined}
             aria-busy={loading || undefined}
             className={cn(
               "relative",
@@ -678,7 +1030,7 @@ function PaletteDialog({
                 <span className="grid size-10 place-items-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" aria-hidden>
                   <Search className="size-4" />
                 </span>
-                <p className="text-zinc-600 dark:text-zinc-300">{emptyText(q)}</p>
+                <p className="text-zinc-600 dark:text-zinc-300">{emptyMessage}</p>
               </div>
             ) : (
               sections.map((section) => {
@@ -708,6 +1060,8 @@ function PaletteDialog({
                             if (!cmd.disabled && !isActive) setActiveKey(opt.key);
                           }}
                           onMouseDown={(e) => e.preventDefault()}
+                          // run() only reads refs when clicked, never during render; the rule can't tell through the call.
+                          // eslint-disable-next-line react-hooks/refs
                           onClick={() => run(opt)}
                           className={cn(
                             "relative flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-1.5",
@@ -724,22 +1078,32 @@ function PaletteDialog({
                                 : "border-zinc-200 bg-white text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400",
                             )}
                           >
-                            {cmd.icon ?? <span className="size-1.5 rounded-full bg-current" />}
+                            {opt.icon ?? cmd.icon ?? <span className="size-1.5 rounded-full bg-current" />}
                           </span>
                           <span className="min-w-0 flex-1 truncate">
                             {opt.path.length > 0 && (
-                              <span className="text-zinc-500 dark:text-zinc-400">
+                              <span className="text-zinc-600 dark:text-zinc-400">
                                 {opt.path.map((p) => p.label).join(" › ")} ›{" "}
                               </span>
                             )}
-                            <Highlight text={cmd.label} indices={opt.indices} />
-                            {cmd.description && (
-                              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{cmd.description}</span>
+                            <Highlight text={opt.display ?? cmd.label} indices={opt.indices} />
+                            {opt.chip && (
+                              <span className="ml-2 inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+                                {opt.chip}
+                              </span>
+                            )}
+                            {opt.learned && (
+                              <span className="ml-2 inline-flex items-center rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                                {learnedLabel}
+                              </span>
+                            )}
+                            {cmd.description && !opt.display && (
+                              <span className="ml-2 text-xs text-zinc-600 dark:text-zinc-400">{cmd.description}</span>
                             )}
                           </span>
                           {isRunning ? (
                             <Loader2 className="size-4 shrink-0 text-indigo-600 motion-safe:animate-spin dark:text-indigo-400" aria-hidden />
-                          ) : cmd.children ? (
+                          ) : cmd.children || (cmd.arg && opt.value === undefined) ? (
                             <ChevronRight className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" aria-hidden />
                           ) : cmd.shortcut?.length ? (
                             <span className="hidden shrink-0 gap-1 sm:flex" aria-hidden>
@@ -776,7 +1140,7 @@ function PaletteDialog({
             <span className="inline-flex items-center gap-1.5">
               <Kbd>↵</Kbd> run
             </span>
-            {stack.length > 0 && (
+            {(stack.length > 0 || argStep) && (
               <span className="inline-flex items-center gap-1.5">
                 <Kbd>⌫</Kbd> back
               </span>

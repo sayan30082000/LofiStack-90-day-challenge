@@ -3,6 +3,7 @@
 //
 //   npm run build && npm start      (or npm run dev)
 //   npm run a11y                    BASE_URL=https://lofistack-sayan.netlify.app npm run a11y
+//   ONLY=command-palette npm run a11y   (one page; the report then covers only that page)
 //
 // Writes docs/a11y-report.md and exits with 1 when anything fails.
 import fs from "node:fs";
@@ -21,7 +22,8 @@ const registry = fs.readFileSync(path.join(root, "lib/registry.ts"), "utf8");
 const slugs = [...registry.matchAll(/slug:\s*"([^"]+)"[\s\S]*?week:\s*(\d+)/g)]
   .filter((m) => Number(m[2]) <= released)
   .map((m) => m[1]);
-const pages = ["/", ...slugs.map((s) => `/components/${s}`)];
+// ONLY=command-palette npm run a11y   checks just the pages whose path contains that text.
+const pages = ["/", ...slugs.map((s) => `/components/${s}`)].filter((p) => !process.env.ONLY || p.includes(process.env.ONLY));
 
 // Interactive states that only exist after a click: audited on top of the page as loaded.
 const STATES = {
@@ -77,6 +79,38 @@ const STATES = {
       },
     },
   ],
+  "/components/command-palette": [
+    {
+      label: "inline value + learned pick",
+      run: async (p) => {
+        await p.getByRole("button", { name: "Open the palette" }).click();
+        await p.getByRole("combobox").pressSequentially("accent pink");
+      },
+    },
+    {
+      label: "value step with an error",
+      run: async (p) => {
+        await p.getByRole("combobox").fill("zoom");
+        await p.keyboard.press("Enter");
+        await p.getByRole("combobox").pressSequentially("300");
+      },
+    },
+    {
+      label: "shortcut tip",
+      run: async (p) => {
+        await p.keyboard.press("Escape");
+        for (let i = 0; i < 3; i++) {
+          await p.getByRole("button", { name: "Open the palette" }).click();
+          await p.getByRole("combobox").fill("mode");
+          await p.keyboard.press("Enter");
+        }
+        await p.getByRole("button", { name: "Open the palette" }).click();
+      },
+    },
+  ],
+  "/components/logo-marquee": [
+    { label: "optical sizing off", run: (p) => p.getByRole("button", { name: "Optical sizing" }).click() },
+  ],
   "/components/tree-view": [
     { label: "changes only", run: (p) => p.getByRole("button", { name: /^Changes/ }).first().click() },
   ],
@@ -104,11 +138,21 @@ try {
         await page.waitForTimeout(400);
       }
       const violations = await page.evaluate(async () => {
-        const r = await axe.run(document, {
+        const options = {
           runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
           resultTypes: ["violations"],
-        });
-        return r.violations.map((v) => ({
+        };
+        // While a modal is open, the page behind it sits under a semi-transparent backdrop and is
+        // inactive. axe blends the backdrop into background colors but not text colors, so its
+        // contrast numbers there are wrong: check contrast inside the dialog only.
+        const modal = document.querySelector("[aria-modal=\"true\"]");
+        const found = modal
+          ? [
+              ...(await axe.run(document, { ...options, rules: { "color-contrast": { enabled: false } } })).violations,
+              ...(await axe.run(modal, { ...options, runOnly: { type: "rule", values: ["color-contrast"] } })).violations,
+            ]
+          : (await axe.run(document, options)).violations;
+        return found.map((v) => ({
           id: v.id,
           impact: v.impact,
           help: v.help,

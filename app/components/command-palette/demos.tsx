@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ALargeSmall,
+  PenLine,
   Archive,
   ArrowUpToLine,
   Bookmark,
@@ -27,20 +28,14 @@ import { cn } from "@/lib/utils";
 /* ---------- Demo app: commands that change this page ---------- */
 
 const ACCENTS = {
-  indigo: { name: "Indigo", dot: "bg-indigo-500", text: "text-indigo-600 dark:text-indigo-400", button: "bg-indigo-600 hover:bg-indigo-500", soft: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
-  violet: { name: "Violet", dot: "bg-violet-500", text: "text-violet-600 dark:text-violet-400", button: "bg-violet-600 hover:bg-violet-500", soft: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
-  emerald: { name: "Emerald", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", button: "bg-emerald-700 hover:bg-emerald-600", soft: "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" },
-  rose: { name: "Rose", dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400", button: "bg-rose-600 hover:bg-rose-500", soft: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
-  amber: { name: "Amber", dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", button: "bg-amber-700 hover:bg-amber-600", soft: "bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
+  indigo: { name: "Indigo", keywords: ["blue", "purple"], dot: "bg-indigo-500", text: "text-indigo-600 dark:text-indigo-400", button: "bg-indigo-600 hover:bg-indigo-500", soft: "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  violet: { name: "Violet", keywords: ["purple", "lilac"], dot: "bg-violet-500", text: "text-violet-600 dark:text-violet-400", button: "bg-violet-600 hover:bg-violet-500", soft: "bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" },
+  emerald: { name: "Emerald", keywords: ["green", "teal"], dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400", button: "bg-emerald-700 hover:bg-emerald-600", soft: "bg-emerald-50 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  rose: { name: "Rose", keywords: ["pink", "red"], dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400", button: "bg-rose-600 hover:bg-rose-500", soft: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" },
+  amber: { name: "Amber", keywords: ["yellow", "orange", "gold"], dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400", button: "bg-amber-700 hover:bg-amber-600", soft: "bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
 } as const;
 type Accent = keyof typeof ACCENTS;
 
-const SIZES = {
-  sm: { name: "Small", body: "text-[13px]", title: "text-lg" },
-  base: { name: "Default", body: "text-sm", title: "text-xl" },
-  lg: { name: "Large", body: "text-base", title: "text-2xl" },
-} as const;
-type Size = keyof typeof SIZES;
 
 function isEditable(el: EventTarget | null) {
   return el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
@@ -61,7 +56,8 @@ export function DemoAppPalette() {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
   const [accent, setAccent] = useState<Accent>("indigo");
-  const [size, setSize] = useState<Size>("base");
+  const [zoom, setZoom] = useState(100);
+  const [title, setTitle] = useState("Everything is one keystroke away");
   const [bookmarked, setBookmarked] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -135,33 +131,53 @@ export function DemoAppPalette() {
         id: "accent",
         group: "Theme",
         label: "Change accent color",
+        description: ACCENTS[accent].name,
         icon: <Palette />,
-        keywords: ["color", "brand"],
-        children: (Object.keys(ACCENTS) as Accent[]).map((key) => ({
-          id: `accent-${key}`,
-          group: "Accent color",
-          label: ACCENTS[key].name,
-          description: key === accent ? "current" : undefined,
-          icon: <span className={cn("size-3 rounded-full", ACCENTS[key].dot)} />,
-          onRun: () => setAccent(key),
-        })),
+        keywords: ["accent", "color", "colour", "brand"],
+        // Type "accent teal" or "color pink" straight away, or pick from a list.
+        arg: {
+          kind: "choice",
+          name: "color",
+          placeholder: "Pick a color",
+          options: (Object.keys(ACCENTS) as Accent[]).map((key) => ({
+            value: key,
+            label: ACCENTS[key].name,
+            keywords: [...ACCENTS[key].keywords],
+            icon: <span className={cn("size-3 rounded-full", ACCENTS[key].dot)} />,
+          })),
+        },
+        onRun: (value) => {
+          setAccent(value as Accent);
+          showToast(`Accent: ${ACCENTS[value as Accent].name}`);
+        },
       },
       {
-        id: "size",
+        id: "zoom",
         group: "Theme",
-        label: "Change text size",
+        label: "Zoom text",
+        description: `${zoom}%`,
         icon: <ALargeSmall />,
-        keywords: ["font", "zoom", "bigger", "smaller"],
-        children: (Object.keys(SIZES) as Size[]).map((key) => ({
-          id: `size-${key}`,
-          group: "Text size",
-          label: SIZES[key].name,
-          description: key === size ? "current" : undefined,
-          onRun: () => setSize(key),
-        })),
+        keywords: ["zoom", "font", "size", "bigger", "smaller"],
+        // "zoom 125" or "font 90%"
+        arg: { kind: "number", name: "zoom level", min: 80, max: 150, unit: "%", placeholder: "Type a zoom level from 80 to 150" },
+        onRun: (value) => setZoom(value as number),
+      },
+      {
+        id: "rename",
+        group: "Actions",
+        label: "Rename this page",
+        icon: <PenLine />,
+        keywords: ["title", "heading", "rename"],
+        arg: {
+          kind: "text",
+          name: "title",
+          placeholder: "Type a new title",
+          validate: (v) => (v.length > 60 ? "Keep the title under 60 characters" : null),
+        },
+        onRun: (value) => setTitle(String(value)),
       },
     ];
-  }, [router, theme, accent, size, bookmarked]);
+  }, [router, theme, accent, zoom, bookmarked]);
 
   // Make the shortcut hints real while the palette is closed.
   useEffect(() => {
@@ -179,7 +195,6 @@ export function DemoAppPalette() {
   }, [open, commands]);
 
   const a = ACCENTS[accent];
-  const s = SIZES[size];
 
   return (
     <div ref={surfaceRef} className={cn("w-full max-w-2xl", theme)}>
@@ -201,18 +216,21 @@ export function DemoAppPalette() {
           </div>
         </div>
 
-        <div className={cn("flex flex-col gap-3 px-4 py-5 sm:px-6", s.body)}>
+        <div className="flex flex-col gap-3 px-4 py-5 text-sm sm:px-6" style={{ fontSize: `${(14 * zoom) / 100}px` }}>
           <p className={cn("text-xs font-semibold uppercase tracking-wider", a.text)}>Getting started</p>
-          <h3 className={cn("font-semibold tracking-tight", s.title)}>Everything is one keystroke away</h3>
+          <h3 className="font-semibold tracking-tight" style={{ fontSize: `${(20 * zoom) / 100}px` }}>
+            {title}
+          </h3>
           <p className="text-zinc-600 dark:text-zinc-400">
             Press <kbd className="rounded border border-zinc-300 px-1 font-sans text-xs dark:border-zinc-700">Ctrl</kbd> +{" "}
             <kbd className="rounded border border-zinc-300 px-1 font-sans text-xs dark:border-zinc-700">K</kbd> (or ⌘K) anywhere on
-            this page. Try “dark”, “acc” or “vio”, open a sub-page, then press Backspace to go back.
+            this page. Type a command with its value: “accent pink”, “zoom 125” or “rename Hello”. Pick the same result for “th” a
+            couple of times and it moves to the top; run a command with a shortcut 3 times and the palette tells you the shortcut.
           </p>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className={cn("rounded-md px-2 py-1 font-medium", a.soft)}>Accent: {a.name}</span>
             <span className="rounded-md bg-zinc-100 px-2 py-1 font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-              Text: {s.name}
+              Zoom: {zoom}%
             </span>
             <span className="rounded-md bg-zinc-100 px-2 py-1 font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
               Theme: {theme ?? "page"}
@@ -306,6 +324,7 @@ export function LoadingPalette() {
         hotkey="/"
         loading={loading}
         maxRecent={0}
+        storageKey={null}
         triggerLabel="Jump to a project…"
         placeholder="Search projects and actions…"
         emptyText={(q) => `Nothing called “${q}”. Try “mob” or “docs”.`}

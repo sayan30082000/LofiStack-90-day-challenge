@@ -88,6 +88,15 @@ export const agentLogs: AgentLog[] = [
       "Two ready-to-edit drafts in about 10 minutes, every claim traceable to the repo. Writing them surfaced a real problem: my Week 14 Before/After Slider has to be replaced before Week 14. The drafts are kept outside the public repo and were not sent; sending them is my decision. Saved about 45 minutes.",
     automated: true,
   },
+  {
+    week: 7,
+    task: "Turn a real team meeting transcript into decisions, action items and open questions, and check the meeting tool's own action items",
+    agent: "Claude Code (a sub-agent reading the Fireflies transcript)",
+    workflow: "From this meeting transcript (exported from Fireflies), produce: 1) decisions made, with timestamps, 2) action items as a table (task, owner, due date, priority, timestamp), 3) open questions, 4) a 5-line summary I can paste into the team chat. Don't invent owners or dates that aren't in the transcript; mark them \"unassigned\" / \"no date\". Then compare your list with the action items Fireflies generated itself: what did it miss, and which of its items are wrong, duplicated or vague? Quote the line that shows it. Keep the output private, outside the public repo.",
+    result:
+      "From a 55-minute team meeting: 15 decisions (2 tentative), 28 action items and 14 open questions. Only 5 tasks had a date said aloud and 7 had no clear owner, so it flagged those instead of guessing. Against Fireflies' own list it found 10 tasks Fireflies missed (including the one approval a launch was waiting on) and 15 of Fireflies' 28 items that were wrong, duplicated, vague or already settled later in the meeting, e.g. a task given to the person who asked the question rather than the one who said \"I have to check that\". The transcript stays private; only these counts are public. Saved about an hour of note-taking and checking.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -140,9 +149,9 @@ Add an "npm test" script, run the tests, fix any real bug you find in the compon
   {
     week: 7,
     kind: "Meeting notes to action items",
-    task: "Turn the weekly team meeting transcript into decisions and tasks",
-    agent: "Claude",
-    prompt: `From this meeting transcript (pasted below), produce: 1) decisions made, 2) action items as a table (task, owner, due date, priority), 3) open questions, 4) a 5-line summary I can paste into the team channel. Don't invent owners or dates that aren't in the transcript; mark them "unassigned".`,
+    task: "Turn a real team meeting transcript into decisions, action items and open questions, and check the meeting tool's own action items",
+    agent: "Claude Code",
+    prompt: `From this meeting transcript (exported from Fireflies), produce: 1) decisions made, with timestamps, 2) action items as a table (task, owner, due date, priority, timestamp), 3) open questions, 4) a 5-line summary I can paste into the team chat. Don't invent owners or dates that aren't in the transcript; mark them "unassigned" / "no date". Then compare your list with the action items Fireflies generated itself: what did it miss, and which of its items are wrong, duplicated or vague? Quote the line that shows it. Keep the output private, outside the public repo.`,
   },
   {
     week: 8,

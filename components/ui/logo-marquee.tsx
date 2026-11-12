@@ -1,13 +1,13 @@
 "use client";
 
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface LogoMarqueeItem {
   /** Image URL of the logo. */
   src?: string;
-  /** Optional image URL used in dark mode, e.g. a light wordmark. */
+  /** Optional image URL used in dark mode, e.g. a light wordmark. Sized like `src`. */
   srcDark?: string;
   /** Accessible name: the image alt text, or a visible text fallback when there is no src or node. */
   alt: string;
@@ -22,12 +22,19 @@ export type LogoMarqueeDirection = "left" | "right" | "up" | "down";
 export interface LogoMarqueeProps {
   /** Logos to scroll. With rows > 1 they are split into that many rows, in order. */
   items: LogoMarqueeItem[];
-  /** Seconds for one full loop. Higher is slower. */
+  /**
+   * Speed in pixels per second. Every row moves at this speed whatever its length, so rows
+   * with different numbers of logos stay in step.
+   */
+  pxPerSecond?: number;
+  /** Seconds for one full loop instead of pxPerSecond. Rows of different lengths then move at different speeds. */
   speed?: number;
   /** Direction of the first row. "up" and "down" make a vertical marquee. */
   direction?: LogoMarqueeDirection;
   /** Pause while the pointer is over the marquee. It always pauses while a link inside has keyboard focus. */
   pauseOnHover?: boolean;
+  /** Let people grab a row and drag it to scrub through the logos. */
+  draggable?: boolean;
   /** Fade the edges with a mask. */
   fade?: boolean;
   /** Width (or height, when vertical) of the fade, in px. */
@@ -38,8 +45,16 @@ export interface LogoMarqueeProps {
   rows?: number;
   /** Show logos in grayscale and bring color back on hover or focus. */
   grayscale?: boolean;
-  /** Height of image logos, in px. */
+  /**
+   * Height of image logos, in px. With `normalize`, this is the height a typical 3:1 wordmark
+   * gets; other shapes are sized to look as big.
+   */
   logoHeight?: number;
+  /**
+   * Optical sizing: measure each image logo's visible ink (trimming transparent or flat padding)
+   * and size it so wide, tall, thin and heavy logos all look the same size.
+   */
+  normalize?: boolean;
   /** Height of the marquee when vertical, in px. */
   height?: number;
   /** Optional heading shown above the strip, e.g. "Trusted by teams at". Also names the region. */
@@ -58,6 +73,118 @@ export interface LogoMarqueeProps {
   itemClassName?: string;
 }
 
+/* ---------- Optical sizing (pure) ---------- */
+
+/** Where the visible part of a logo sits in its image, in pixels of the analysed bitmap. */
+export interface LogoInk {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Share of the ink box that is covered, 0–1. Heavy, filled logos are dense; thin outlines are not. */
+  density: number;
+}
+
+/**
+ * Finds a logo's ink in RGBA pixel data. The background is transparency, or, for opaque images,
+ * the top-left corner's color. Returns null for an empty image.
+ */
+export function analyzeLogoPixels(data: ArrayLike<number>, width: number, height: number): LogoInk | null {
+  const transparent = data[3] < 16;
+  const [br, bg, bb] = [data[0], data[1], data[2]];
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let ink = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const a = data[i + 3];
+      if (a <= 40) continue;
+      if (!transparent && Math.abs(data[i] - br) + Math.abs(data[i + 1] - bg) + Math.abs(data[i + 2] - bb) <= 60) continue;
+      ink += transparent ? a / 255 : 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) return null;
+  const w = maxX - minX + 1;
+  const h = maxY - minY + 1;
+  return { x: minX, y: minY, width: w, height: h, density: ink / (w * h) };
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * Height to give a logo's ink so it looks as big as the others. Equal heights make wide
+ * wordmarks dominate and square marks look tiny, so the height scales with 1/√aspect (keeping
+ * the visible area roughly equal), relative to a typical 3:1 wordmark at `base` px. Dense,
+ * heavy logos are then nudged smaller and thin, airy ones larger.
+ */
+export function opticalLogoHeight(inkAspect: number, density: number | null, base: number): number {
+  let h = clamp(base * Math.sqrt(3 / inkAspect), base * 0.5, base * 1.6);
+  if (density !== null && density > 0) h *= clamp(Math.sqrt(0.3 / density), 0.82, 1.22);
+  // Very long wordmarks still dominate a row, so cap their width (without going unreadably thin).
+  h = Math.max(Math.min(h, (base * 7) / inkAspect), base * 0.42);
+  return Math.round(h * 10) / 10;
+}
+
+/** A logo's ink as fractions of its image, plus its density. */
+interface Measured {
+  aspect: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  density: number | null;
+}
+
+function measureLogo(img: HTMLImageElement): Measured | null {
+  const nw = img.naturalWidth;
+  const nh = img.naturalHeight;
+  if (!nw || !nh) return null;
+  const plain: Measured = { aspect: nw / nh, left: 0, top: 0, width: 1, height: 1, density: null };
+  try {
+    // Small SVGs report tiny natural sizes, so draw at a fixed size for a useful sample.
+    const scale = 160 / Math.max(nw, nh);
+    const w = Math.max(1, Math.round(nw * scale));
+    const h = Math.max(1, Math.round(nh * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return plain;
+    ctx.drawImage(img, 0, 0, w, h);
+    const ink = analyzeLogoPixels(ctx.getImageData(0, 0, w, h).data, w, h);
+    if (!ink) return plain;
+    return { aspect: nw / nh, left: ink.x / w, top: ink.y / h, width: ink.width / w, height: ink.height / h, density: ink.density };
+  } catch {
+    // A cross-origin image without CORS can't be read: fall back to its outer shape.
+    return plain;
+  }
+}
+
+/** Image size and negative margins that make the ink box, not the padded image, the logo's footprint. */
+function opticalStyle(m: Measured, base: number): CSSProperties {
+  const inkAspect = (m.width * m.aspect) / m.height;
+  const inkHeight = opticalLogoHeight(inkAspect, m.density, base);
+  const imgHeight = inkHeight / m.height;
+  const imgWidth = imgHeight * m.aspect;
+  return {
+    height: imgHeight,
+    width: imgWidth,
+    marginLeft: -m.left * imgWidth,
+    marginRight: -(1 - m.left - m.width) * imgWidth,
+    marginTop: -m.top * imgHeight,
+    marginBottom: -(1 - m.top - m.height) * imgHeight,
+  };
+}
+
+/* ---------- Component ---------- */
+
 const STYLES = `
 @keyframes lofi-logo-marquee-x { to { transform: translate3d(calc(-100% - var(--lofi-logo-marquee-gap)), 0, 0); } }
 @keyframes lofi-logo-marquee-y { to { transform: translate3d(0, calc(-100% - var(--lofi-logo-marquee-gap)), 0); } }
@@ -71,6 +198,10 @@ const STYLES = `
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--lofi-logo-marquee-fade), #000 calc(100% - var(--lofi-logo-marquee-fade)), transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 var(--lofi-logo-marquee-fade), #000 calc(100% - var(--lofi-logo-marquee-fade)), transparent);
 }
+.lofi-logo-marquee-row[data-draggable="true"] { cursor: grab; }
+.lofi-logo-marquee-row[data-draggable="true"][data-axis="x"] { touch-action: pan-y; }
+.lofi-logo-marquee-row[data-draggable="true"][data-axis="y"] { touch-action: pan-x; }
+.lofi-logo-marquee-row[data-dragging="true"] { cursor: grabbing; user-select: none; }
 .lofi-logo-marquee-track {
   display: flex; flex-shrink: 0; align-items: center; justify-content: space-around;
   gap: var(--lofi-logo-marquee-gap); min-width: 100%;
@@ -83,9 +214,10 @@ const STYLES = `
 .lofi-logo-marquee-row[data-reverse="true"] .lofi-logo-marquee-track { animation-direction: reverse; }
 .lofi-logo-marquee[data-paused="true"] .lofi-logo-marquee-track,
 .lofi-logo-marquee[data-hover-pause="true"] .lofi-logo-marquee-rows:hover .lofi-logo-marquee-track,
+.lofi-logo-marquee-row[data-dragging="true"] .lofi-logo-marquee-track,
 .lofi-logo-marquee-rows:focus-within .lofi-logo-marquee-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
-  .lofi-logo-marquee-row, .lofi-logo-marquee-row[data-axis="y"] { height: auto; -webkit-mask-image: none !important; mask-image: none !important; flex-direction: row; }
+  .lofi-logo-marquee-row, .lofi-logo-marquee-row[data-axis="y"] { height: auto; -webkit-mask-image: none !important; mask-image: none !important; flex-direction: row; cursor: auto !important; }
   .lofi-logo-marquee-rows[data-axis="y"] { height: auto !important; }
   .lofi-logo-marquee-track, .lofi-logo-marquee-row[data-axis="y"] .lofi-logo-marquee-track {
     animation: none; flex-direction: row; flex-wrap: wrap; justify-content: center;
@@ -102,20 +234,24 @@ function chunk<T>(list: T[], parts: number): T[][] {
 }
 
 /**
- * Infinite logo strip: the set is rendered twice and shifted by one set width
- * with CSS keyframes, so the loop is seamless at any container width.
+ * Infinite logo strip: the set is rendered twice and shifted by one set width with CSS
+ * keyframes, so the loop is seamless at any width. Image logos are optically sized, every row
+ * moves at the same pixel speed, and rows can be dragged.
  */
 export function LogoMarquee({
   items,
-  speed = 30,
+  pxPerSecond = 40,
+  speed,
   direction = "left",
   pauseOnHover = true,
+  draggable = true,
   fade = true,
   fadeSize = 64,
   gap = 48,
   rows = 1,
   grayscale = true,
   logoHeight = 28,
+  normalize = true,
   height = 320,
   title,
   label = "Logos",
@@ -127,43 +263,109 @@ export function LogoMarquee({
 }: LogoMarqueeProps) {
   const titleId = useId();
   const [paused, setPaused] = useState(false);
-
-  if (items.length === 0) return null;
+  const [measured, setMeasured] = useState<Record<string, Measured | null>>({});
+  const [lengths, setLengths] = useState<number[]>([]);
+  const [dragRow, setDragRow] = useState<number | null>(null);
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const drag = useRef<{ row: number; start: number; times: number[]; moved: boolean } | null>(null);
 
   const vertical = direction === "up" || direction === "down";
   const baseReverse = direction === "right" || direction === "down";
   const groups = chunk(items, Math.max(1, Math.floor(rows)));
+  const rowCount = groups.length;
+
+  // Measure each row's length (one copy of its logos) so every row can move at pxPerSecond.
+  useEffect(() => {
+    if (speed !== undefined || typeof ResizeObserver === "undefined") return;
+    const tracks = rowRefs.current.slice(0, rowCount).map((row) => row?.querySelector<HTMLElement>(".lofi-logo-marquee-track") ?? null);
+    const update = () =>
+      setLengths((prev) => {
+        const next = tracks.map((t) => (t ? Math.round(vertical ? t.offsetHeight : t.offsetWidth) : 0));
+        return next.length === prev.length && next.every((n, i) => n === prev[i]) ? prev : next;
+      });
+    const ro = new ResizeObserver(update);
+    tracks.forEach((t) => t && ro.observe(t));
+    return () => ro.disconnect();
+  }, [speed, rowCount, vertical]);
+
+  if (items.length === 0) return null;
+
+  const durationFor = (r: number) => (speed !== undefined ? speed : lengths[r] ? (lengths[r] + gap) / pxPerSecond : 30);
+
+  /* Dragging: pause the row's two tracks and move their animations by the drag distance. */
+  const animationsOf = (r: number) => {
+    const row = rowRefs.current[r];
+    return row && typeof row.getAnimations === "function" ? row.getAnimations({ subtree: true }) : [];
+  };
+  const onPointerDown = (r: number) => (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!draggable || e.button !== 0) return;
+    const anims = animationsOf(r);
+    if (!anims.length) return; // reduced motion: nothing moves, nothing to drag
+    drag.current = { row: r, start: vertical ? e.clientY : e.clientX, times: anims.map((a) => Number(a.currentTime ?? 0)), moved: false };
+  };
+  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const delta = (vertical ? e.clientY : e.clientX) - d.start;
+    if (!d.moved) {
+      if (Math.abs(delta) < 6) return;
+      d.moved = true;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      setDragRow(d.row);
+    }
+    const reverse = baseReverse !== (d.row % 2 === 1);
+    const cycle = (lengths[d.row] || (vertical ? e.currentTarget.offsetHeight : e.currentTarget.offsetWidth)) + gap;
+    const ms = durationFor(d.row) * 1000;
+    // Dragging toward the end of the axis moves logos that way: back in time for a normal row.
+    const shift = (-delta / cycle) * ms * (reverse ? -1 : 1);
+    animationsOf(d.row).forEach((a, i) => {
+      a.currentTime = ((((d.times[i] ?? 0) + shift) % ms) + ms) % ms;
+    });
+  };
+  const endDrag = () => {
+    if (drag.current?.moved) setDragRow(null);
+    // Keep `moved` until the click that follows a drag has been swallowed.
+    setTimeout(() => (drag.current = null), 0);
+  };
+
+  // Measured even with normalize off, so turning it on later needs no reload.
+  const record = (key: string, img: HTMLImageElement) =>
+    setMeasured((prev) => (key in prev ? prev : { ...prev, [key]: measureLogo(img) }));
+
+  const renderImage = (item: LogoMarqueeItem, src: string, extra?: string) => {
+    const m = normalize ? measured[item.src!] : undefined;
+    const own = src === item.src;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- logos have arbitrary sizes and may be remote; plain img keeps the component generic
+      <img
+        src={src}
+        alt={item.alt}
+        draggable={false}
+        // An image that finished loading before hydration never fires onLoad, so check on mount too.
+        ref={own ? (el) => void (el?.complete && el.naturalWidth && record(item.src!, el)) : undefined}
+        onLoad={own ? (e) => record(item.src!, e.currentTarget) : undefined}
+        style={m ? opticalStyle(m, logoHeight) : { height: logoHeight }}
+        className={cn("w-auto max-w-none shrink-0", extra)}
+      />
+    );
+  };
 
   const renderItem = (item: LogoMarqueeItem, key: string) => {
-    const content = item.node ?? (item.src ? (
-      <>
-        {/* eslint-disable-next-line @next/next/no-img-element -- logos have arbitrary sizes and may be remote; plain img keeps the component generic */}
-        <img
-          src={item.src}
-          alt={item.alt}
-          draggable={false}
-          style={{ height: logoHeight }}
-          className={cn("w-auto max-w-none", item.srcDark && "dark:hidden")}
-        />
-        {item.srcDark && (
-          // eslint-disable-next-line @next/next/no-img-element -- see above
-          <img
-            src={item.srcDark}
-            alt={item.alt}
-            draggable={false}
-            style={{ height: logoHeight }}
-            className="hidden w-auto max-w-none dark:block"
-          />
-        )}
-      </>
-    ) : (
-      <span className="whitespace-nowrap text-lg font-semibold tracking-tight text-zinc-700 dark:text-zinc-300">{item.alt}</span>
-    ));
+    const content =
+      item.node ??
+      (item.src ? (
+        <>
+          {renderImage(item, item.src, item.srcDark ? "dark:hidden" : undefined)}
+          {item.srcDark && renderImage(item, item.srcDark, "hidden dark:block")}
+        </>
+      ) : (
+        <span className="whitespace-nowrap text-lg font-semibold tracking-tight text-zinc-700 dark:text-zinc-300">{item.alt}</span>
+      ));
 
     const cell = cn(
       "flex min-h-10 shrink-0 items-center justify-center",
       grayscale &&
-        "opacity-70 grayscale transition-[filter,opacity] duration-300 hover:opacity-100 hover:grayscale-0 focus-within:opacity-100 focus-within:grayscale-0 motion-reduce:transition-none",
+        "grayscale transition-[filter] duration-300 hover:grayscale-0 focus-within:grayscale-0 motion-reduce:transition-none",
       itemClassName,
     );
 
@@ -172,6 +374,11 @@ export function LogoMarquee({
         {item.href ? (
           <a
             href={item.href}
+            onClick={(e) => {
+              // A drag that ends on a link isn't a click.
+              if (drag.current?.moved) e.preventDefault();
+            }}
+            draggable={false}
             className="flex min-h-10 items-center rounded-md px-1 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
           >
             {content}
@@ -185,7 +392,6 @@ export function LogoMarquee({
 
   const vars = {
     "--lofi-logo-marquee-gap": `${gap}px`,
-    "--lofi-logo-marquee-duration": `${speed}s`,
     "--lofi-logo-marquee-fade": `${fadeSize}px`,
   } as CSSProperties;
 
@@ -233,10 +439,20 @@ export function LogoMarquee({
         {groups.map((group, r) => (
           <div
             key={r}
+            ref={(el) => {
+              rowRefs.current[r] = el;
+            }}
             className="lofi-logo-marquee-row min-w-0 flex-1"
             data-axis={vertical ? "y" : "x"}
             data-reverse={baseReverse !== (r % 2 === 1)}
             data-fade={fade}
+            data-draggable={draggable}
+            data-dragging={dragRow === r}
+            style={{ "--lofi-logo-marquee-duration": `${durationFor(r)}s` } as CSSProperties}
+            onPointerDown={onPointerDown(r)}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
           >
             <ul className="lofi-logo-marquee-track">{group.map((item, i) => renderItem(item, `a-${i}`))}</ul>
             {/* Second copy for the seamless loop: hidden from assistive tech and from the tab order. */}

@@ -15,21 +15,20 @@ Build the "Command Palette" component (#31, Type: modal) for my LofiStack compon
 Route: /components/command-palette
 
 What it does:
-- Opens with Cmd+K / Ctrl+K and from a trigger button showing the shortcut.
-- Fuzzy-filters commands and highlights matched letters.
-- Grouped sections (Navigation, Actions, Theme); recent commands shown first.
-- Up/Down, Enter runs, Esc closes.
-- Nested pages: a command can open a sub-list; Backspace on an empty search goes back.
-- Shortcut hints on the right of each row.
+- A complete command palette: opens with Cmd+K / Ctrl+K and a trigger button showing the shortcut; fuzzy search with highlighted letters; grouped sections; recent commands first; Up/Down, Enter, Esc; nested pages (children) with Backspace on an empty search to go back; shortcut hints; disabled commands; async commands with a spinner and inline error; a polished highlight that glides between rows.
+- Commands that take a value: CommandItem.arg is { kind: "choice", options: { value, label, keywords?, icon? }[] } | { kind: "number", min?, max?, unit? } | { kind: "text", validate? }, and onRun(value) receives it. Exported pure matchWithArgument(cmd, query) splits a search like "accent pink" or "font 125%" into leading words that appear in the label or a keyword and a valid value (choices match label, value or keywords, so "pink" picks Rose). Such matches are listed first under "Run with this value" with the value as a chip.
+- Choosing a command that needs a value without typing one opens a value step: a chip with the command name, the choices to pick from (fuzzy filtered) or a number/text box. Exported pure parseArgument(arg, text) validates it and its message is shown as the empty state ("Enter a number from 80 to 150%", "No color matches “xyz”"). Backspace on an empty value goes back and restores the search.
+- Learning (learn, default on): each run records which command was picked for which search (exported pure rememberRun, last 100 searches). learnedBoost(memory, query, id) adds 40 per pick of the exact search and 20 per pick of a longer or shorter version ("th" and "the" help each other), capped at 160, so a command you always pick for "t" moves to the top and shows a "Your usual pick" badge. Stored in localStorage under storageKey (null = this page view only), wrapped in try/catch.
+- Shortcut coaching (tipAfter, default 3): once a command that has a shortcut has been run from the palette 3 times, the next opening shows a one-time note "You've run “Toggle dark mode” from here 3 times. Next time, press ⇧ D" with a Got it button.
 
 Props (export an interface named CommandPaletteProps):
-commands: { id, label, group, icon?, shortcut?, keywords?, onRun?, children? }[], open?, onOpenChange, placeholder, hotkey (default 'k')
+commands: { id, label, group, icon?, description?, shortcut?, keywords?, onRun?(value), arg?, children?, disabled?, keepOpen? }[], open? / defaultOpen / onOpenChange, placeholder, hotkey ('k', null = off), showTrigger, triggerLabel, label, recentLabel, maxRecent, defaultRecent, loading, loadingText, emptyText, backLabel, closeLabel, showFooter, portal, learn, tipAfter, storageKey, quickRunLabel, learnedLabel, tipText, tipDismissLabel
 
 Accessibility:
-Dialog with focus trap; combobox + listbox pattern with aria-activedescendant; focus restored on close.
+Dialog with aria-modal and a focus trap, focus restored on close; combobox + listbox with aria-activedescendant; labelled role=group sections; in the value step the combobox is renamed ("Zoom text: zoom level") and number values use inputMode=decimal; the result count, empty or error message and the tip sentence are announced in a polite status region; the tip has a real dismiss button; motion removed with prefers-reduced-motion.
 
 Demo page shows:
-About 12 commands that really change the demo page (toggle theme, scroll to sections, copy link, open a "Change accent color" sub-page).
+1) A docs page whose palette really changes it: "accent pink" (choice with keywords), "zoom 125" (number 80–150%), "rename Hello" (validated text), toggle theme with a working ⇧D shortcut, scroll to sections, copy links, a failing and a disabled command. 2) A project switcher with a different hotkey, skeleton loading and storageKey={null}.
 
 Project context: this goes into my existing LofiStack gallery (Next.js App Router + TypeScript + Tailwind CSS v4, lucide-react icons, cn() helper in lib/utils.ts, shared <ComponentPage> layout in components/gallery/ComponentPage.tsx, registry in lib/registry.ts).
 
@@ -63,19 +62,19 @@ Build the "Logo Marquee" component (#60, Type: section) for my LofiStack compone
 Route: /components/logo-marquee
 
 What it does:
-- Infinite horizontal scroll by duplicating the content and animating with CSS keyframes.
-- Speed and direction props; pause on hover.
-- Edge fade masks; grayscale to color on hover.
-- Optional second row moving the opposite way; vertical variant.
+- Seamless infinite marquee: the set is rendered twice and shifted by one set width with CSS keyframes; direction left/right/up/down; several rows (columns when vertical) with every other one reversed; edge fade masks; grayscale until hover/focus; pause on hover and while a link has focus; a 40px pause/play button; title or label names the region.
+- Optical sizing (normalize, default on): when an image logo loads it is drawn on a small canvas and exported pure analyzeLogoPixels(rgba, w, h) finds its ink box (background = transparency or the corner color) and density. Exported pure opticalLogoHeight(inkAspect, density, logoHeight) gives the ink height: scaled by 1/√aspect relative to a 3:1 wordmark (clamped 0.5–1.6×), nudged by density (heavy logos smaller, thin ones larger), and very long wordmarks capped at 7× logoHeight wide but never thinner than 0.42×. The image is sized so its ink gets that height, with negative margins that cancel the file's empty padding. Cross-origin images that can't be read fall back to their outer shape. Measuring also happens on mount for images loaded before hydration.
+- Even speed: pxPerSecond (default 40) sets each row's loop duration from its measured length (ResizeObserver), so rows with different numbers of logos move at the same speed; speed (seconds per loop) is still accepted.
+- Drag to scrub (draggable, default on): grab a row and drag it; the row's CSS animations are paused and their currentTime moved by the drag distance, then they resume from there. touch-action keeps page scrolling on the other axis, and a drag that ends on a link doesn't open it.
 
 Props (export an interface named LogoMarqueeProps):
-items: { src?, alt, href?, node? }[], speed (seconds per loop), direction: 'left' | 'right' | 'up' | 'down', pauseOnHover, fade, gap, rows?
+items: { src?, srcDark?, alt, href?, node? }[], pxPerSecond, speed?, direction: 'left' | 'right' | 'up' | 'down', pauseOnHover, draggable, fade, fadeSize, gap, rows, grayscale, logoHeight, normalize, height, title, label, showControls, pauseLabel, playLabel, className, itemClassName
 
 Accessibility:
-Duplicate set is aria-hidden; with reduced motion the animation stops and items wrap into a static grid.
+The duplicate set is aria-hidden and inert; a pause/play button covers WCAG 2.2.2 and dragging is never the only way to control it; with reduced motion the animation stops and logos wrap into a static grid; image logos need alt text; no opacity on the grayscale state.
 
 Demo page shows:
-"Trusted by" logos (generate simple wordmark SVGs) and a two-row tech stack marquee.
+1) Six fictional logos with very different shapes (square icon, 11:1 thin wordmark, heavy block, a file with lots of empty padding, thin outline mark, tall stacked logo) with an Optical sizing switch to compare. 2) "Trusted by" wordmarks with light and dark versions. 3) A two-row tech stack of custom nodes. 4) A vertical two-column marquee.
 
 Project context: this goes into my existing LofiStack gallery (Next.js App Router + TypeScript + Tailwind CSS v4, lucide-react icons, cn() helper in lib/utils.ts, shared <ComponentPage> layout in components/gallery/ComponentPage.tsx, registry in lib/registry.ts).
 
