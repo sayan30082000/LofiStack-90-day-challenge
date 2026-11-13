@@ -30,8 +30,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # LayoutProps and the route types come from .next/types, which a fresh checkout doesn't have.
       - name: Type-check
-        run: npx tsc --noEmit
+        run: |
+          npx next typegen
+          npx tsc --noEmit
 
       - name: Lint
         run: npm run lint
