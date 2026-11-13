@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Check, CircleAlert, LoaderCircle, Pencil, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CircleAlert, Clock, History, LoaderCircle, Pencil, RotateCcw, Shuffle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Error message per field name. Empty or missing entries count as valid. */
@@ -49,6 +49,13 @@ export interface WizardStep<V> {
   validate?: (values: V) => WizardErrors<V> | null | undefined | Promise<WizardErrors<V> | null | undefined>;
   /** Rows shown for this step on the review screen. */
   summary?: (values: V) => WizardSummaryItem[];
+  /**
+   * Show this step only when it returns true, e.g. a Billing step for paid plans. Re-checked as
+   * values change; the progress header and the time left update, and the change is announced.
+   */
+  when?: (values: V) => boolean;
+  /** How many fields the step has, for the time-left estimate. Default 2. */
+  fields?: number;
 }
 
 export interface WizardLabels {
@@ -73,6 +80,19 @@ export interface WizardLabels {
   submitError: string;
   /** Review rows when a step has no summary. */
   noSummary: string;
+  /** Shown and announced when an answer adds a step. */
+  stepAdded: (title: string) => string;
+  /** Shown and announced when an answer removes a step. */
+  stepRemoved: (title: string) => string;
+  stepCount: (total: number) => string;
+  /** Time-left text from an estimate in seconds. */
+  timeLeft: (seconds: number) => string;
+  /** Saved-draft banner text. */
+  resumeTitle: (age: string, step: string | null) => string;
+  resume: string;
+  startFresh: string;
+  /** Announced after resuming. */
+  resumed: string;
 }
 
 export interface MultiStepFormProps<V extends Record<string, unknown>> {
@@ -90,6 +110,17 @@ export interface MultiStepFormProps<V extends Record<string, unknown>> {
   successDescription?: ReactNode | ((values: V) => ReactNode);
   /** Called when "Start over" is pressed on the success screen. Omit to hide the button. */
   onRestart?: () => void;
+  /**
+   * Save progress in localStorage under this key. Coming back later offers "Resume" or
+   * "Start fresh"; the draft is removed after a successful submit.
+   */
+  persistKey?: string;
+  /** Fields never written to the saved draft, e.g. passwords or card numbers. */
+  persistExclude?: Extract<keyof V, string>[];
+  /** Show an "About 2 min left" estimate that adapts to the person's own pace. */
+  showTimeLeft?: boolean;
+  /** Starting guess for the time-left estimate, in seconds per field. */
+  secondsPerField?: number;
   /** Override any button or status text. */
   labels?: Partial<WizardLabels>;
   className?: string;
@@ -112,7 +143,19 @@ const DEFAULT_LABELS: WizardLabels = {
   completed: "completed",
   submitError: "Something went wrong. Please try again.",
   noSummary: "Nothing to show.",
+  stepAdded: (t) => `Added a step: ${t}.`,
+  stepRemoved: (t) => `Removed a step: ${t}.`,
+  stepCount: (n) => `${n} steps now.`,
+  timeLeft: formatTimeLeftLabel,
+  resumeTitle: (age, step) => `You have a saved draft from ${age}${step ? `, at “${step}”` : ""}.`,
+  resume: "Resume",
+  startFresh: "Start fresh",
+  resumed: "Draft restored. Picked up where you left off.",
 };
+
+function formatTimeLeftLabel(seconds: number) {
+  return formatTimeLeft(seconds);
+}
 
 const STYLE = `
 @keyframes lofi-multi-step-form-from-right { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
@@ -185,8 +228,61 @@ export const wizardInputClass = cn(
 
 type Phase = "form" | "submitting" | "success";
 
+const REVIEW_ID = "__review";
+
+/* ---------- Time left (pure) ---------- */
+
+/**
+ * Next seconds-per-field estimate after finishing a step: a running average that leans 40% on
+ * the newest step, kept between 2 and 60 seconds so one long pause can't wreck it.
+ */
+export function updatePace(previous: number | null, sample: number): number {
+  const next = previous === null ? sample : previous * 0.6 + sample * 0.4;
+  return Math.min(60, Math.max(2, Math.round(next * 10) / 10));
+}
+
+/** "Less than a minute left" / "About 3 min left". */
+export function formatTimeLeft(seconds: number): string {
+  if (seconds < 45) return "Less than a minute left";
+  return `About ${Math.max(1, Math.round(seconds / 60))} min left`;
+}
+
+/* ---------- Saved drafts ---------- */
+
+interface Draft {
+  values: Record<string, unknown>;
+  stepId: string;
+  savedAt: number;
+}
+
+function readDraft(key: string): Draft | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) ?? "null");
+    if (raw && typeof raw.values === "object" && typeof raw.stepId === "string" && typeof raw.savedAt === "number") return raw;
+  } catch {
+    // Blocked or corrupt storage: no draft.
+  }
+  return null;
+}
+
+/** "just now", "5 minutes ago", "2 hours ago", "3 days ago". */
+export function draftAge(ms: number): string {
+  const min = Math.round(ms / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+
+/** The steps that apply to these values, in order. */
+export function activeSteps<V>(steps: WizardStep<V>[], values: V): WizardStep<V>[] {
+  return steps.filter((s) => !s.when || s.when(values));
+}
+
 export function MultiStepForm<V extends Record<string, unknown>>({
-  steps,
+  steps: allSteps,
   initialValues,
   onSubmit,
   showReview = true,
@@ -194,14 +290,18 @@ export function MultiStepForm<V extends Record<string, unknown>>({
   successTitle = "All done",
   successDescription = "Your details were submitted.",
   onRestart,
+  persistKey,
+  persistExclude = [],
+  showTimeLeft = true,
+  secondsPerField = 12,
   labels: labelsProp,
   className,
 }: MultiStepFormProps<V>) {
   const L = { ...DEFAULT_LABELS, ...labelsProp };
   const uid = useId();
   const [values, setValues] = useState<V>(initialValues);
-  const [current, setCurrent] = useState(0);
-  const [visited, setVisited] = useState(0);
+  const [currentId, setCurrentId] = useState(allSteps[0]?.id ?? REVIEW_ID);
+  const [visitedIds, setVisitedIds] = useState<string[]>([allSteps[0]?.id ?? REVIEW_ID]);
   const [direction, setDirection] = useState<"next" | "prev" | null>(null);
   const [errors, setErrors] = useState<WizardErrors<V>>({});
   const [phase, setPhase] = useState<Phase>("form");
@@ -209,24 +309,66 @@ export function MultiStepForm<V extends Record<string, unknown>>({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fromReview, setFromReview] = useState(false);
   const [submitted, setSubmitted] = useState<V | null>(null);
+  const [notice, setNotice] = useState("");
+  const [pace, setPace] = useState<number | null>(null);
+  // Saved draft found when the form mounted, and whether the person chose to resume or start fresh.
+  const [draft, setDraft] = useState<(Draft & { age: string }) | null>(null);
+  const [draftChecked, setDraftChecked] = useState(!persistKey);
+  const [draftDecided, setDraftDecided] = useState(false);
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   const successRef = useRef<HTMLHeadingElement>(null);
   const pendingFocus = useRef<string | null>(null);
-  const lastView = useRef("0|form");
+  const lastView = useRef(`${currentId}|form`);
+  const stepStart = useRef(0);
 
-  const total = steps.length + (showReview ? 1 : 0);
+  // Steps can come and go with the answers (`when`), so everything below works on the active list.
+  const steps = activeSteps(allSteps, values);
+  const flowIds = [...steps.map((s) => s.id), ...(showReview ? [REVIEW_ID] : [])];
+  const total = flowIds.length;
   const reviewIndex = showReview ? steps.length : -1;
+  const found = flowIds.indexOf(currentId);
+  const current = found === -1 ? 0 : found;
   const isReview = current === reviewIndex;
   const lastIndex = total - 1;
   const submitting = phase === "submitting";
+  const visited = Math.max(0, ...flowIds.map((id, i) => (visitedIds.includes(id) ? i : -1)));
 
   const fieldId = (name: string) => `${uid}-f-${name}`;
   const errorId = (name: string) => `${uid}-e-${name}`;
 
+  // Look for a saved draft once, after hydration (storage doesn't exist on the server).
+  // Time on each step, for the pace behind "About 2 min left".
+  useEffect(() => {
+    stepStart.current = Date.now();
+  }, [currentId]);
+
+  useEffect(() => {
+    if (!persistKey) return;
+    const t = setTimeout(() => {
+      const d = readDraft(persistKey);
+      setDraft(d ? { ...d, age: draftAge(Date.now() - d.savedAt) } : null);
+      setDraftChecked(true);
+    }, 0);
+    return () => clearTimeout(t);
+  }, [persistKey]);
+
+  // Save progress (never before the person has answered the resume question, never after submitting).
+  useEffect(() => {
+    if (!persistKey || !draftChecked || (draft && !draftDecided) || phase !== "form") return;
+    const pristine = currentId === allSteps[0]?.id && JSON.stringify(values) === JSON.stringify(initialValues);
+    try {
+      if (pristine) return;
+      const kept = Object.fromEntries(Object.entries(values).filter(([k]) => !persistExclude.includes(k as Extract<keyof V, string>)));
+      localStorage.setItem(persistKey, JSON.stringify({ values: kept, stepId: currentId, savedAt: Date.now() }));
+    } catch {
+      // Storage full or blocked: the form still works, it just won't resume.
+    }
+  }, [persistKey, draftChecked, draft, draftDecided, phase, values, currentId, allSteps, initialValues, persistExclude]);
+
   // Focus the new step's heading (or the field that failed) whenever the step changes.
   // Keyed on step + success so mount (and Strict Mode's double effect) never steals focus.
-  const viewKey = `${current}|${phase === "success" ? "success" : "form"}`;
+  const viewKey = `${currentId}|${phase === "success" ? "success" : "form"}`;
   useEffect(() => {
     if (lastView.current === viewKey) return;
     lastView.current = viewKey;
@@ -244,11 +386,13 @@ export function MultiStepForm<V extends Record<string, unknown>>({
       if (focusField) document.getElementById(focusField)?.focus();
       return;
     }
+    const id = flowIds[index];
     pendingFocus.current = focusField ?? null;
     setDirection(index > current ? "next" : "prev");
-    setCurrent(index);
-    setVisited((v) => Math.max(v, index));
+    setCurrentId(id);
+    setVisitedIds((v) => (v.includes(id) ? v : [...v, id]));
     setSubmitError(null);
+    setNotice("");
   };
 
   const firstErrorField = (errs: WizardErrors<V>) => {
@@ -276,7 +420,15 @@ export function MultiStepForm<V extends Record<string, unknown>>({
         return false;
       }
       setErrors({});
-      if (target !== current) go(target);
+      if (target !== current) {
+        // Learn this person's pace from the step they just finished.
+        const done = steps[current];
+        if (done && target === current + 1) {
+          const seconds = (Date.now() - stepStart.current) / 1000;
+          setPace((p) => updatePace(p, seconds / Math.max(1, done.fields ?? 2)));
+        }
+        go(target);
+      }
       return true;
     } finally {
       setValidating(false);
@@ -298,6 +450,13 @@ export function MultiStepForm<V extends Record<string, unknown>>({
     setPhase("submitting");
     try {
       await onSubmit(values);
+      if (persistKey) {
+        try {
+          localStorage.removeItem(persistKey);
+        } catch {
+          // Nothing to clean up.
+        }
+      }
       setSubmitted(values);
       setPhase("success");
     } catch (err) {
@@ -343,16 +502,56 @@ export function MultiStepForm<V extends Record<string, unknown>>({
   const restart = () => {
     setValues(initialValues);
     setErrors({});
-    setVisited(0);
+    setVisitedIds([allSteps[0]?.id ?? REVIEW_ID]);
     setFromReview(false);
     setSubmitted(null);
     setDirection(null);
-    setCurrent(0);
+    setCurrentId(allSteps[0]?.id ?? REVIEW_ID);
+    setNotice("");
     setPhase("form");
     onRestart?.();
   };
 
+  const resume = () => {
+    if (!draft) return;
+    const restored = { ...initialValues, ...draft.values } as V;
+    const flow = [...activeSteps(allSteps, restored).map((s) => s.id), ...(showReview ? [REVIEW_ID] : [])];
+    const at = Math.max(0, flow.indexOf(draft.stepId));
+    setValues(restored);
+    setVisitedIds(flow.slice(0, at + 1));
+    setDirection("next");
+    setCurrentId(flow[at]);
+    setDraftDecided(true);
+    setNotice(L.resumed);
+    // Same step as before (often the first): still move focus to it.
+    if (flow[at] === currentId) setTimeout(() => headingRef.current?.focus(), 0);
+  };
+
+  const startFresh = () => {
+    if (persistKey) {
+      try {
+        localStorage.removeItem(persistKey);
+      } catch {
+        // Nothing to remove.
+      }
+    }
+    setDraftDecided(true);
+    setDraft(null);
+    setTimeout(() => headingRef.current?.focus(), 0);
+  };
+
   const setValue = <K extends keyof V>(name: K, value: V[K]) => {
+    // Say so when an answer adds or removes steps, e.g. a paid plan adds "Billing".
+    const before = activeSteps(allSteps, values);
+    const after = activeSteps(allSteps, { ...values, [name]: value });
+    const added = after.filter((s) => !before.includes(s));
+    const removed = before.filter((s) => !after.includes(s));
+    if (added.length || removed.length) {
+      const count = after.length + (showReview ? 1 : 0);
+      setNotice(
+        [...added.map((s) => L.stepAdded(s.title)), ...removed.map((s) => L.stepRemoved(s.title)), L.stepCount(count)].join(" "),
+      );
+    }
     setValues((prev) => ({ ...prev, [name]: value }));
     const key = String(name) as Extract<keyof V, string>;
     setErrors((prev) => {
@@ -380,6 +579,10 @@ export function MultiStepForm<V extends Record<string, unknown>>({
 
   const stepTitle = (i: number) => (i === reviewIndex ? L.reviewTitle : steps[i]?.title);
   const headingId = `${uid}-heading`;
+  const fieldsLeft = steps.slice(current).reduce((sum, s) => sum + (s.fields ?? 2), 0);
+  const timeLeft = showTimeLeft && !isReview && fieldsLeft > 0 ? L.timeLeft(fieldsLeft * (pace ?? secondsPerField)) : null;
+  const showResume = Boolean(persistKey && draft && !draftDecided && phase === "form");
+  const draftStep = draft ? allSteps.find((s) => s.id === draft.stepId)?.title ?? (draft.stepId === REVIEW_ID ? L.reviewTitle : null) : null;
 
   /* ---------- Success ---------- */
 
@@ -448,9 +651,29 @@ export function MultiStepForm<V extends Record<string, unknown>>({
       {/* Progress header */}
       <div className="border-b border-zinc-200 px-5 pb-4 pt-5 @lg:px-7 dark:border-zinc-800">
         {title && <p className="mb-3 text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{title}</p>}
-        <p className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400" aria-hidden>
-          {L.stepOf(current + 1, total)}
-          <span className="@xl:hidden"> · {stepTitle(current)}</span>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <p className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400" aria-hidden>
+            {L.stepOf(current + 1, total)}
+            <span className="@xl:hidden"> · {stepTitle(current)}</span>
+          </p>
+          {timeLeft && (
+            <p className="inline-flex items-center gap-1 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+              <Clock aria-hidden className="size-3.5" />
+              {timeLeft}
+            </p>
+          )}
+        </div>
+        {/* Always present so screen readers hear changes to it. */}
+        <p
+          role="status"
+          className={cn(
+            notice
+              ? "mt-2 flex items-start gap-1.5 rounded-md bg-indigo-50 px-2 py-1.5 text-xs font-medium text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-200"
+              : "sr-only",
+          )}
+        >
+          {notice && <Shuffle aria-hidden className="mt-px size-3.5 shrink-0" />}
+          {notice}
         </p>
         <nav aria-label={L.progress} className="mt-3">
           <ol className="flex gap-1.5">
@@ -529,6 +752,30 @@ export function MultiStepForm<V extends Record<string, unknown>>({
               direction === "prev" && "lofi-multi-step-form-prev",
             )}
           >
+            {showResume && (
+              <div className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-900 @md:flex-row @md:items-center dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100">
+                <p className="flex min-w-0 flex-1 items-start gap-2 text-sm">
+                  <History aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  {L.resumeTitle(draft!.age, draftStep)}
+                </p>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={resume}
+                    className="inline-flex h-10 items-center rounded-lg bg-amber-900 px-3.5 text-sm font-semibold text-white outline-none hover:bg-amber-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200"
+                  >
+                    {L.resume}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startFresh}
+                    className="inline-flex h-10 items-center rounded-lg px-3 text-sm font-medium text-amber-900 outline-none hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-amber-100 dark:hover:bg-amber-400/15"
+                  >
+                    {L.startFresh}
+                  </button>
+                </div>
+              </div>
+            )}
             <h3
               id={headingId}
               ref={headingRef}

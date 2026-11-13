@@ -111,6 +111,32 @@ const STATES = {
   "/components/logo-marquee": [
     { label: "optical sizing off", run: (p) => p.getByRole("button", { name: "Optical sizing" }).click() },
   ],
+  "/components/multi-step-form": [
+    {
+      label: "paid plan adds Billing",
+      run: async (p) => {
+        const w = p.locator('[id$="-panel-preview"]').first();
+        await w.getByLabel("Full name").fill("Jane Cooper");
+        await w.getByLabel("Work email").fill("jane@example.com");
+        await w.getByRole("button", { name: "Continue" }).click();
+        await w.getByLabel("Workspace name").fill("Northwind Studio");
+        await w.locator("select").first().selectOption({ index: 2 });
+        await w.getByRole("button", { name: "Continue" }).click();
+        await w.getByText("Team", { exact: true }).first().click();
+        await w.getByText(/Added a step: Billing/).waitFor();
+      },
+    },
+    {
+      label: "resume offer",
+      run: async (p) => {
+        await p.reload({ waitUntil: "networkidle" });
+        await p.getByRole("button", { name: "Resume" }).waitFor();
+      },
+    },
+  ],
+  "/components/donut-chart": [
+    { label: "Other opened", run: (p) => p.getByRole("button", { name: /^Other/ }).first().click() },
+  ],
   "/components/tree-view": [
     { label: "changes only", run: (p) => p.getByRole("button", { name: /^Changes/ }).first().click() },
   ],
@@ -137,6 +163,8 @@ try {
         await state.run(page);
         await page.waitForTimeout(400);
       }
+      // A state may reload the page, which drops axe: inject it again.
+      if (!(await page.evaluate(() => typeof window.axe !== "undefined"))) await page.addScriptTag({ content: axeSource });
       const violations = await page.evaluate(async () => {
         const options = {
           runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },

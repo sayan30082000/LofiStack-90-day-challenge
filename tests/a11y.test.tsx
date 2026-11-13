@@ -7,6 +7,8 @@ import * as animatedTabs from "@/app/components/animated-tabs/demos";
 import * as commandPalette from "@/app/components/command-palette/demos";
 import * as banglaInput from "@/app/components/bangla-phonetic-input/demos";
 import * as confirmDialog from "@/app/components/confirm-dialog/demos";
+import * as donutChart from "@/app/components/donut-chart/demos";
+import * as multiStepForm from "@/app/components/multi-step-form/demos";
 import * as logoMarquee from "@/app/components/logo-marquee/demos";
 import * as fileDropzone from "@/app/components/file-dropzone/demos";
 import * as otpInput from "@/app/components/otp-input/demos";
@@ -37,6 +39,8 @@ const PAGES: Record<string, Record<string, unknown>> = {
   "tilt-card": tiltCard,
   "command-palette": commandPalette,
   "logo-marquee": logoMarquee,
+  "multi-step-form": multiStepForm,
+  "donut-chart": donutChart,
 };
 
 const demos = Object.entries(PAGES).flatMap(([page, mod]) =>

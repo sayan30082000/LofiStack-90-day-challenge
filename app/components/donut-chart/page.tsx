@@ -4,10 +4,13 @@ import { ExpensesDemo, StatesDemo, TrafficDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "Donut Chart",
-  description: "Hand-built SVG donut chart with parallel-edged gaps, hover push-out, a live center readout and legend toggles that re-animate.",
+  description:
+    "A donut chart that groups tiny slices into an Other slice you can open, and compares with an earlier period: a faint ring of last month's shares, a change on every category and the biggest rise and drop in words.",
 };
 
 const expensesCode = `
+// groupBelow: slices under 4% become one "Other" slice that opens its own breakdown.
+// previous: last month by label → change per category, a faint inner ring, biggest rise and drop.
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 <DonutChart
@@ -19,6 +22,9 @@ const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",
     { label: "Dining out", value: 320 },
     // …
   ]}
+  previous={august}          // same labels, one month earlier
+  previousLabel="August"
+  groupBelow={0.04}          // slices under 4% → "Other"
   format={(v) => usd.format(v)}
   centerLabel="spent this month"
   legendPosition="right"   // falls back to bottom below 32rem
@@ -79,9 +85,9 @@ export default function Page() {
       slug="donut-chart"
       examples={[
         {
-          title: "Monthly expense breakdown",
+          title: "Grouped small slices, compared with last month",
           description:
-            "Hover a segment or a legend item to push it out and read its value and share in the center. Click legend items to hide categories; the remaining arcs re-flow with a tween instead of redrawing.",
+            "Health, Subscriptions, Gifts and Books are each under 4%, so they share one Other slice: open it from the ring or the legend to see them as their own donut. With August as the previous period, each category shows its change, a faint inner ring shows August's shares, and the top line names the biggest rise and drop. Hover to read a category; click to hide it.",
           preview: <ExpensesDemo />,
           code: expensesCode,
           minHeight: 400,
@@ -125,6 +131,10 @@ export default function Page() {
         { name: "hiddenText", type: "string", default: '"hidden"', description: "Screen-reader suffix for hidden legend items and table rows." },
         { name: "tableHeaders", type: "[string, string, string]", default: '["Category", "Value", "Share"]', description: "Headers of the screen-reader table." },
         { name: "animationDuration", type: "number", default: "700", description: "Mount and toggle tween in ms. 0 or reduced motion jumps straight to the result." },
+        { name: "groupBelow", type: "number", default: "0", description: "Slices smaller than this share (e.g. 0.04) become one Other slice, which opens its own breakdown. Needs two or more small slices. Hiding one inside Other shrinks Other too." },
+        { name: "otherLabel / backLabel", type: "string", default: '"Other" / "All categories"', description: "Name of the grouped slice and of the button that leaves its breakdown." },
+        { name: "previous", type: "DonutDatum[]", description: "The same categories for an earlier period, matched by label: adds a faint inner ring of the old shares, a ▲/▼ change per category (\"new\" when there was none) and a biggest-rise / biggest-drop line." },
+        { name: "previousLabel", type: "string", default: '"last period"', description: "Names the earlier period in text and in the spoken summary, e.g. \"August\"." },
         { name: "className", type: "string", description: "Classes for the root element." },
       ]}
       types={[
@@ -134,6 +144,14 @@ export default function Page() {
             { name: "label", type: "string", description: "Category name, unique within the chart." },
             { name: "value", type: "number", description: "Non-negative value. Negative values count as 0." },
             { name: "color", type: "string", description: "Any CSS color for this segment." },
+          ],
+        },
+        {
+          name: "groupSmallSlices / compareDonut / biggestChanges",
+          props: [
+            { name: "groupSmallSlices(data, threshold, otherLabel?)", type: "{ data, grouped }", description: "Data with the small slices replaced by one Other slice (placed last), and the slices that went into it." },
+            { name: "compareDonut(data, previous)", type: "DonutChange[]", description: "Each category with its earlier value (null when new) and relative change." },
+            { name: "biggestChanges(changes)", type: "{ rise, drop }", description: "The largest increase and decrease, or null." },
           ],
         },
         {
@@ -152,6 +170,8 @@ export default function Page() {
         "Identity is never color alone: every segment is named in the legend and table, and hidden items are struck through as well as hollow.",
         "The default palette is a fixed-order, colorblind-checked set with separate light and dark steps; text never uses series colors.",
         "Reduced motion removes the sweep, the toggle tween and the push-out transition.",
+        "Other is a plain button (not a toggle) named with its count and change, e.g. “Other (4), up 48% from August, show the 4 categories”. Opening it moves focus to the “All categories” button, and going back returns focus to Other.",
+        "Changes are spoken in words in the legend and the summary (“down 28% from August”), not just as ▲/▼ arrows, and the arrows never rely on red or green.",
       ]}
     />
   );

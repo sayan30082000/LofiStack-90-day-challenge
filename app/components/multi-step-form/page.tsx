@@ -5,11 +5,13 @@ import { CreateWorkspaceDemo, FeedbackDemo } from "./demos";
 export const metadata: Metadata = {
   title: "Multi-Step Form Wizard",
   description:
-    "Config-driven form wizard with per-step sync or async validation, a clickable segmented progress header, a review screen with Edit links and an async submit.",
+    "A form wizard whose steps follow your answers (a paid plan adds a Billing step, and it says so), that saves your progress so you can resume later, and that tells you how long is left, learning from your own pace.",
 };
 
 const workspaceCode = `
-type Values = { fullName: string; email: string; workspace: string; teamSize: string; plan: string };
+// when: the step exists only for some answers. fields: how many inputs it has (for the time left).
+// persistKey: progress is saved; coming back offers Resume / Start fresh.
+type Values = { fullName: string; email: string; workspace: string; teamSize: string; plan: string; billingEmail: string };
 
 const steps: WizardStep<Values>[] = [
   {
@@ -40,13 +42,23 @@ const steps: WizardStep<Values>[] = [
     render: (ctx) => <WorkspaceFields {...ctx} />,
   },
   { id: "plan", title: "Plan", validate: (v) => (v.plan ? {} : { plan: "Pick a plan." }), render: (ctx) => <PlanPicker {...ctx} /> },
+  {
+    id: "billing",
+    title: "Billing",
+    fields: 2,
+    // Only paid plans have this step: picking Team adds it, Starter removes it.
+    when: (v) => v.plan === "team" || v.plan === "business",
+    validate: (v) => (v.billingEmail ? {} : { billingEmail: "Enter the email that should get invoices." }),
+    render: (ctx) => <BillingFields {...ctx} />,
+  },
 ];
 
 <MultiStepForm
   title="Create workspace"
   steps={steps}
-  initialValues={{ fullName: "", email: "", workspace: "", teamSize: "", plan: "" }}
+  initialValues={{ fullName: "", email: "", workspace: "", teamSize: "", plan: "", billingEmail: "" }}
   showReview
+  persistKey="create-workspace"   // resume later; cleared after submit
   onSubmit={(values) => api.createWorkspace(values)}   // reject to show an error
   labels={{ submit: "Create workspace", submitting: "Creating…", validating: "Checking name…" }}
   successTitle="Your workspace is ready"
@@ -95,9 +107,9 @@ export default function Page() {
       slug="multi-step-form"
       examples={[
         {
-          title: "Create workspace",
+          title: "Steps that follow your answers, a draft you can resume",
           description:
-            "Account → Workspace → Plan → Review. Each Next runs that step's validate (the workspace step is async). Completed steps in the header are clickable, Back keeps data, and Edit on the review screen returns you there with “Save and review”.",
+            "Account → Workspace → Plan → Review. Pick Team or Business and a Billing step appears in the header (announced as “Added a step: Billing. 5 steps now.”); pick Starter and it goes away. Progress is saved as you go: reload the page and it offers to resume where you were. The time left starts as a guess and adapts to how fast you fill steps in.",
           preview: <CreateWorkspaceDemo />,
           code: workspaceCode,
           minHeight: 560,
@@ -120,7 +132,11 @@ export default function Page() {
         { name: "successTitle", type: "ReactNode", default: '"All done"', description: "Heading of the success screen." },
         { name: "successDescription", type: "ReactNode | (values: V) => ReactNode", default: '"Your details were submitted."', description: "Body of the success screen." },
         { name: "onRestart", type: "() => void", description: "Shows a Start over button on the success screen; values reset to initialValues." },
-        { name: "labels", type: "Partial<WizardLabels>", description: "Override button and status text: next, back, toReview, submit, submitting, validating, edit, returnToReview, restart, reviewTitle, reviewDescription, progress, stepOf, completed, submitError, noSummary." },
+        { name: "persistKey", type: "string", description: "Save values and the current step in localStorage under this key. Coming back shows “You have a saved draft from 2 hours ago, at “Billing”” with Resume and Start fresh. Removed after a successful submit." },
+        { name: "persistExclude", type: "(keyof V)[]", default: "[]", description: "Fields never written to the draft, e.g. passwords or card numbers." },
+        { name: "showTimeLeft", type: "boolean", default: "true", description: "“About 2 min left” in the header, from the remaining steps' fields × seconds per field." },
+        { name: "secondsPerField", type: "number", default: "12", description: "Starting guess for the estimate. After each finished step it moves toward the person's own pace (updatePace)." },
+        { name: "labels", type: "Partial<WizardLabels>", description: "Override button and status text: next, back, toReview, submit, submitting, validating, edit, returnToReview, restart, reviewTitle, reviewDescription, progress, stepOf, completed, submitError, noSummary, stepAdded, stepRemoved, stepCount, timeLeft, resumeTitle, resume, startFresh, resumed." },
         { name: "className", type: "string", description: "Classes for the root card." },
       ]}
       types={[
@@ -133,6 +149,8 @@ export default function Page() {
             { name: "render", type: "(ctx: WizardStepContext<V>) => ReactNode", description: "Renders the step's fields." },
             { name: "validate", type: "(values: V) => WizardErrors<V> | Promise<…> | void", description: "Errors keyed by field name. Empty means valid. Async is fine." },
             { name: "summary", type: "(values: V) => { label, value }[]", description: "Rows for the review screen." },
+            { name: "when", type: "(values: V) => boolean", description: "Show the step only when this returns true. Re-checked as values change; the header, the count and the time left update, and the change is announced." },
+            { name: "fields", type: "number", default: "2", description: "How many fields the step has, for the time-left estimate." },
           ],
         },
         {
@@ -164,6 +182,8 @@ export default function Page() {
         "Enter in any field runs Next (the step is a real <form>). Buttons stay focusable with aria-disabled while validating or submitting.",
         "Submit errors render in role=\"alert\"; the success screen is a role=\"status\" region and its heading receives focus.",
         "The slide between steps and the success check animation are removed under prefers-reduced-motion.",
+        "When an answer adds or removes a step, a visible note under the step count says which (“Added a step: Billing. 5 steps now.”) and it is announced by a status region that is always in the page.",
+        "The saved-draft offer is plain text with two real buttons; resuming moves focus to the restored step's heading and announces “Draft restored”, and starting fresh moves focus to the first step.",
       ]}
     />
   );

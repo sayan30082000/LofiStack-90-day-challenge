@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface DonutDatum {
@@ -62,7 +63,33 @@ export interface DonutChartProps {
   tableHeaders?: [category: string, value: string, share: string];
   /** Duration of the mount and toggle animation in ms. 0 turns it off. Reduced motion always turns it off. */
   animationDuration?: number;
+  /**
+   * Group slices smaller than this share (0 to 1, e.g. 0.04) into one "Other" slice that opens
+   * its own breakdown when clicked. Needs at least two small slices. 0 turns grouping off.
+   */
+  groupBelow?: number;
+  /** Name of the grouped slice. */
+  otherLabel?: string;
+  /** Text of the button that leaves the "Other" breakdown. */
+  backLabel?: string;
+  /**
+   * The same categories for an earlier period (matched by label). Adds a faint inner ring with the
+   * old shares, a change next to each legend item and a line naming the biggest rise and drop.
+   */
+  previous?: DonutDatum[];
+  /** Names the earlier period in text, e.g. "last month". */
+  previousLabel?: string;
   className?: string;
+}
+
+/** A category compared with an earlier period. */
+export interface DonutChange {
+  label: string;
+  value: number;
+  /** Earlier value, or null when the category is new. */
+  previous: number | null;
+  /** Relative change, e.g. 0.12 for +12%. null when there was nothing before to compare with. */
+  change: number | null;
 }
 
 const TAU = Math.PI * 2;
@@ -75,10 +102,12 @@ const STYLE = `
 .lofi-donut-chart {
   --lofi-donut-chart-c1: #2a78d6; --lofi-donut-chart-c2: #eb6834; --lofi-donut-chart-c3: #1baf7a; --lofi-donut-chart-c4: #eda100;
   --lofi-donut-chart-c5: #e87ba4; --lofi-donut-chart-c6: #008300; --lofi-donut-chart-c7: #4a3aa7; --lofi-donut-chart-c8: #e34948;
+  --lofi-donut-chart-other: #a1a1aa;
 }
 .lofi-donut-chart:where(.dark, .dark *):not(:where(.light, .light *)) {
   --lofi-donut-chart-c1: #3987e5; --lofi-donut-chart-c2: #d95926; --lofi-donut-chart-c3: #199e70; --lofi-donut-chart-c4: #c98500;
   --lofi-donut-chart-c5: #d55181; --lofi-donut-chart-c6: #008300; --lofi-donut-chart-c7: #9085e9; --lofi-donut-chart-c8: #e66767;
+  --lofi-donut-chart-other: #71717a;
 }
 .lofi-donut-chart-seg { transition: transform 220ms cubic-bezier(.2,.8,.3,1), opacity 180ms ease; }
 @media (prefers-reduced-motion: reduce) { .lofi-donut-chart-seg { transition: none; } }
@@ -136,8 +165,46 @@ function sectorPath(c: number, rOut: number, rIn: number, a0: number, a1: number
 
 const ease = (t: number) => 1 - (1 - t) ** 3;
 
+/**
+ * Splits off slices smaller than `threshold` of the total into one `otherLabel` slice placed last.
+ * Grouping a single small slice gains nothing, so that case returns the data unchanged.
+ */
+export function groupSmallSlices(data: DonutDatum[], threshold: number, otherLabel = "Other"): { data: DonutDatum[]; grouped: DonutDatum[] } {
+  const total = data.reduce((a, d) => a + Math.max(0, d.value), 0);
+  if (!(threshold > 0) || total <= 0) return { data, grouped: [] };
+  const small = data.filter((d) => d.value > 0 && d.value / total < threshold);
+  if (small.length < 2) return { data, grouped: [] };
+  return {
+    data: [...data.filter((d) => !small.includes(d)), { label: otherLabel, value: small.reduce((a, d) => a + d.value, 0) }],
+    grouped: small,
+  };
+}
+
+/** Pairs each category with its value in `previous` (by label) and the relative change. */
+export function compareDonut(data: DonutDatum[], previous: DonutDatum[]): DonutChange[] {
+  const before = new Map(previous.map((d) => [d.label, Math.max(0, d.value)]));
+  return data.map((d) => {
+    const prev = before.has(d.label) ? before.get(d.label)! : null;
+    return { label: d.label, value: d.value, previous: prev, change: prev ? (d.value - prev) / prev : null };
+  });
+}
+
+/** The biggest rise and the biggest drop among the changes, or null when there is none. */
+export function biggestChanges(changes: DonutChange[]): { rise: DonutChange | null; drop: DonutChange | null } {
+  let rise: DonutChange | null = null;
+  let drop: DonutChange | null = null;
+  for (const c of changes) {
+    if (c.change === null) continue;
+    if (c.change > 0 && (!rise || c.change > rise.change!)) rise = c;
+    if (c.change < 0 && (!drop || c.change < drop.change!)) drop = c;
+  }
+  return { rise, drop };
+}
+
+const signedPercent = (f: number) => `${f > 0 ? "+" : f < 0 ? "−" : ""}${Math.abs(Math.round(f * 100))}%`;
+
 export function DonutChart({
-  data,
+  data: allData,
   label = "Donut chart",
   size = 240,
   thickness = 36,
@@ -159,9 +226,49 @@ export function DonutChart({
   hiddenText = "hidden",
   tableHeaders = ["Category", "Value", "Share"],
   animationDuration = 700,
+  groupBelow = 0,
+  otherLabel = "Other",
+  backLabel = "All categories",
+  previous,
+  previousLabel = "last period",
   className,
 }: DonutChartProps) {
   const [hidden, setHidden] = useState<string[]>(defaultHidden);
+  const [view, setView] = useState<"all" | "other">("all");
+  const backRef = useRef<HTMLButtonElement>(null);
+  const otherRef = useRef<HTMLButtonElement>(null);
+
+  // What is drawn: everything (small slices grouped into "Other"), or the inside of "Other".
+  const grouping = useMemo(() => groupSmallSlices(allData, groupBelow, otherLabel), [allData, groupBelow, otherLabel]);
+  const inOther = view === "other" && grouping.grouped.length > 0;
+  // "Other" adds up only the small categories that are not hidden inside it.
+  const data = useMemo(() => {
+    if (inOther || !grouping.grouped.length) return inOther ? grouping.grouped : grouping.data;
+    const value = grouping.grouped.reduce((sum, d) => sum + (hidden.includes(d.label) ? 0 : Math.max(0, d.value)), 0);
+    return grouping.data.map((d, i) => (i === grouping.data.length - 1 ? { ...d, value } : d));
+  }, [inOther, grouping, hidden]);
+  const otherIndex = !inOther && grouping.grouped.length ? data.length - 1 : -1;
+  // Colors stay tied to each category's position in the full data, whichever view shows it.
+  const colorIndex = useMemo(() => data.map((d) => allData.indexOf(d)), [data, allData]);
+  const changes = useMemo(() => {
+    if (!previous) return null;
+    // "Other" compares with the earlier total of the same small categories.
+    const prev = [...previous, { label: otherLabel, value: compareDonut(grouping.grouped, previous).reduce((a, c) => a + (c.previous ?? 0), 0) }];
+    return compareDonut(data, prev);
+  }, [previous, data, grouping.grouped, otherLabel]);
+
+  const openOther = () => {
+    setView("other");
+    setHovered(null);
+    setPinned(null);
+    setTimeout(() => backRef.current?.focus(), 0);
+  };
+  const closeOther = () => {
+    setView("all");
+    setHovered(null);
+    setPinned(null);
+    setTimeout(() => otherRef.current?.focus(), 0);
+  };
   const [hovered, setHovered] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
 
@@ -204,7 +311,8 @@ export function DonutChart({
     return () => cancelAnimationFrame(raf);
   }, [targets, animationDuration]);
 
-  const colorOf = (i: number) => data[i]?.color ?? colors[i % colors.length];
+  const colorOf = (i: number) =>
+    i === otherIndex ? "var(--lofi-donut-chart-other)" : (data[i]?.color ?? colors[(colorIndex[i] ?? i) % colors.length]);
 
   const candidate = hovered ?? pinned;
   const active = candidate !== null && candidate < data.length && !hiddenFlags[candidate] && values[candidate] > 0 ? candidate : null;
@@ -233,10 +341,25 @@ export function DonutChart({
         ? `${label}. ${allHiddenText}.`
         : `${label}. Total ${format(visibleTotal)}. ` +
           data
-            .map((d, i) => (hiddenFlags[i] || values[i] === 0 ? null : `${d.label} ${format(d.value)}, ${formatPercent(shareOf(i))}`))
+            .map((d, i) =>
+              hiddenFlags[i] || values[i] === 0
+                ? null
+                : `${d.label} ${format(d.value)}, ${formatPercent(shareOf(i))}${changeText(i) ? `, ${changeText(i)}` : ""}`,
+            )
             .filter(Boolean)
             .join("; ") +
           ".";
+
+  /** "up 12% from last month", "new", or "" without a previous period. */
+  function changeText(i: number) {
+    const ch = changes?.[i];
+    if (!ch) return "";
+    if (ch.change === null) return ch.previous === null ? "new" : "";
+    if (ch.change === 0) return `same as ${previousLabel}`;
+    return `${ch.change > 0 ? "up" : "down"} ${Math.abs(Math.round(ch.change * 100))}% from ${previousLabel}`;
+  }
+  // "Other" mixes categories (some may be new), so it never counts as the biggest rise or drop.
+  const { rise, drop } = changes ? biggestChanges(changes.filter((_, i) => !hiddenFlags[i] && i !== otherIndex)) : { rise: null, drop: null };
 
   const right = legendPosition === "right";
   const holePct = (rIn / c) * 100 * 0.92;
@@ -262,6 +385,7 @@ export function DonutChart({
         </span>
         <span className="text-[clamp(0.65rem,5cqw,0.8125rem)] tabular-nums text-zinc-500 dark:text-zinc-400">
           {formatPercent(shareOf(active))}
+          {changes?.[active]?.previous != null && <> · was {format(changes[active].previous!)}</>}
         </span>
       </>
     );
@@ -285,6 +409,41 @@ export function DonutChart({
       <style href="lofi-donut-chart" precedence="default">
         {STYLE}
       </style>
+      {inOther && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button
+            ref={backRef}
+            type="button"
+            onClick={closeOther}
+            className="-ml-2 inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-indigo-700 outline-none hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+          >
+            <ArrowLeft aria-hidden className="size-4" />
+            {backLabel}
+          </button>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <span className="font-semibold text-zinc-900 dark:text-zinc-100">{otherLabel}</span>: {grouping.grouped.length} small categories
+          </p>
+        </div>
+      )}
+      {!loading && (rise || drop) && (
+        <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+          {rise && (
+            <>
+              Biggest rise: <span className="font-medium text-zinc-900 dark:text-zinc-100">{rise.label}</span>{" "}
+              <span className="tabular-nums">{signedPercent(rise.change!)}</span>
+            </>
+          )}
+          {rise && drop && <span aria-hidden> · </span>}
+          {rise && drop && <span className="sr-only">. </span>}
+          {drop && (
+            <>
+              Biggest drop: <span className="font-medium text-zinc-900 dark:text-zinc-100">{drop.label}</span>{" "}
+              <span className="tabular-nums">{signedPercent(drop.change!)}</span>
+            </>
+          )}
+          <span> vs {previousLabel}</span>
+        </p>
+      )}
       <div
         className={cn(
           "flex flex-col items-center gap-6",
@@ -314,6 +473,16 @@ export function DonutChart({
               className={cn("stroke-zinc-100 dark:stroke-zinc-800/80", loading && "motion-safe:animate-pulse")}
             />
             {!loading &&
+              changes &&
+              rIn > 24 &&
+              computeDonutArcs(
+                changes.map((ch) => ch.previous ?? 0),
+                hiddenFlags,
+              ).map((a, i) => {
+                const d = sectorPath(c, rIn - 4, rIn - 9, a.start, a.end, segGap ? 2 : 0);
+                return d ? <path key={`prev-${i}`} d={d} fill={colorOf(i)} opacity={0.45} /> : null;
+              })}
+            {!loading &&
               arcs.map((a, i) => {
                 const d = sectorPath(c, rOut - cr, rIn + cr, a.start, a.end, segGap);
                 if (!d || !data[i]) return null;
@@ -338,7 +507,7 @@ export function DonutChart({
                     }}
                     onPointerEnter={() => setHovered(i)}
                     onPointerLeave={() => setHovered((h) => (h === i ? null : h))}
-                    onClick={() => setPinned((p) => (p === i ? null : i))}
+                    onClick={() => (i === otherIndex ? openOther() : setPinned((p) => (p === i ? null : i)))}
                   />
                 );
               })}
@@ -371,6 +540,50 @@ export function DonutChart({
               : data.map((d, i) => {
                   const isHidden = hiddenFlags[i];
                   const color = colorOf(i);
+                  const ch = changes?.[i];
+                  const changeCell = changes && (
+                    <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-600 dark:text-zinc-300" aria-hidden>
+                      {isHidden || !ch
+                        ? "–"
+                        : ch.change === null
+                          ? ch.previous === null
+                            ? "new"
+                            : "–"
+                          : `${ch.change > 0 ? "▲" : ch.change < 0 ? "▼" : ""} ${Math.abs(Math.round(ch.change * 100))}%`}
+                    </span>
+                  );
+                  if (i === otherIndex) {
+                    return (
+                      <li key={`${d.label}-${i}`}>
+                        <button
+                          ref={otherRef}
+                          type="button"
+                          onClick={openOther}
+                          onPointerEnter={() => setHovered(i)}
+                          onPointerLeave={() => setHovered((h) => (h === i ? null : h))}
+                          onFocus={() => setHovered(i)}
+                          onBlur={() => setHovered((h) => (h === i ? null : h))}
+                          className={cn(
+                            "group flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-left outline-none transition-colors motion-reduce:transition-none",
+                            "hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-indigo-500 active:bg-zinc-200/70 dark:hover:bg-zinc-800/70 dark:active:bg-zinc-800",
+                            active === i && "bg-zinc-100 dark:bg-zinc-800/70",
+                          )}
+                        >
+                          <span aria-hidden className="size-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                          <span className="min-w-0 flex-1 truncate text-zinc-800 dark:text-zinc-200">
+                            {d.label} <span className="text-zinc-600 dark:text-zinc-400">({grouping.grouped.length})</span>
+                            <span className="sr-only">
+                              , {changeText(i) ? `${changeText(i)}, ` : ""}show the {grouping.grouped.length} categories
+                            </span>
+                          </span>
+                          <span className="shrink-0 font-medium tabular-nums text-zinc-900 dark:text-zinc-100">{format(d.value)}</span>
+                          <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-600 dark:text-zinc-400">{formatPercent(shareOf(i))}</span>
+                          {changeCell}
+                          <ChevronRight aria-hidden className="-mr-1 size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
+                        </button>
+                      </li>
+                    );
+                  }
                   return (
                     <li key={`${d.label}-${i}`}>
                       <button
@@ -396,19 +609,23 @@ export function DonutChart({
                           className={cn(
                             "min-w-0 flex-1 truncate",
                             isHidden
-                              ? "text-zinc-500 line-through decoration-zinc-400 dark:text-zinc-400 dark:decoration-zinc-500"
+                              ? "text-zinc-600 line-through decoration-zinc-400 dark:text-zinc-400 dark:decoration-zinc-500"
                               : "text-zinc-800 dark:text-zinc-200",
                           )}
                         >
                           {d.label}
                           {isHidden && <span className="sr-only"> ({hiddenText})</span>}
+                          {!isHidden && changeText(i) && <span className="sr-only">, {changeText(i)}</span>}
                         </span>
-                        <span className={cn("shrink-0 tabular-nums", isHidden ? "text-zinc-500 dark:text-zinc-400" : "font-medium text-zinc-900 dark:text-zinc-100")}>
+                        <span className={cn("shrink-0 tabular-nums", isHidden ? "text-zinc-600 dark:text-zinc-400" : "font-medium text-zinc-900 dark:text-zinc-100")}>
                           {format(d.value)}
                         </span>
-                        <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                        <span className="w-12 shrink-0 text-right text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
                           {isHidden || values[i] === 0 ? "–" : formatPercent(shareOf(i))}
                         </span>
+                        {changeCell}
+                        {/* Keeps the columns in line with the "Other" row and its chevron. */}
+                        {otherIndex >= 0 && <span aria-hidden className="-mr-1 size-4 shrink-0" />}
                       </button>
                     </li>
                   );

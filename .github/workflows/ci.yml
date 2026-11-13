@@ -1,0 +1,75 @@
+# Checks every push to main and every pull request: types, lint, unit + axe tests, that the
+# generated docs are current, a production build, and the full browser accessibility audit.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # same as Netlify (netlify.toml)
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and accessibility tests
+        run: npm test
+
+      - name: Docs are up to date
+        run: |
+          npm run docs
+          if ! git diff --quiet -- docs ':!docs/a11y-report.md'; then
+            echo "::error::docs/ is out of date. Run npm run docs and commit the result."
+            git diff --stat -- docs
+            exit 1
+          fi
+
+      - name: Build
+        run: npm run build
+
+      # The audit drives the Google Chrome that GitHub's Ubuntu runners already have.
+      - name: Accessibility audit (axe, light/dark, 375/1280px)
+        run: |
+          npm start -- --port 3000 > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/ > /dev/null && break
+            sleep 1
+          done
+          npm run a11y
+
+      - name: Audit report in the run summary
+        if: always()
+        run: |
+          if [ -f docs/a11y-report.md ]; then cat docs/a11y-report.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Keep the audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-report
+          path: docs/a11y-report.md
+          if-no-files-found: ignore

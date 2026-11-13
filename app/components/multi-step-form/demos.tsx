@@ -17,9 +17,11 @@ type WorkspaceValues = {
   workspace: string;
   teamSize: string;
   plan: "" | "starter" | "team" | "business";
+  billingEmail: string;
+  vatNumber: string;
 };
 
-const INITIAL: WorkspaceValues = { fullName: "", email: "", workspace: "", teamSize: "", plan: "" };
+const INITIAL: WorkspaceValues = { fullName: "", email: "", workspace: "", teamSize: "", plan: "", billingEmail: "", vatNumber: "" };
 
 const TEAM_SIZES = [
   { value: "1", label: "Just me" },
@@ -50,6 +52,7 @@ const STEPS: WizardStep<WorkspaceValues>[] = [
   {
     id: "account",
     title: "Account",
+    fields: 2,
     description: "Who is setting this workspace up?",
     validate: (v) => {
       const e: WizardErrors<WorkspaceValues> = {};
@@ -98,6 +101,7 @@ const STEPS: WizardStep<WorkspaceValues>[] = [
   {
     id: "workspace",
     title: "Workspace",
+    fields: 2,
     description: "Name it and tell us how big the team is.",
     // Async: pretends to check name availability on the server.
     validate: async (v) => {
@@ -161,6 +165,7 @@ const STEPS: WizardStep<WorkspaceValues>[] = [
   {
     id: "plan",
     title: "Plan",
+    fields: 1,
     description: "You can change plans at any time.",
     validate: (v) => (v.plan ? {} : { plan: "Pick a plan to continue." }),
     summary: (v) => {
@@ -168,6 +173,54 @@ const STEPS: WizardStep<WorkspaceValues>[] = [
       return [{ label: "Plan", value: p ? `${p.name} · ${p.price} ${p.per}` : "" }];
     },
     render: (ctx) => <PlanPicker {...ctx} />,
+  },
+  {
+    id: "billing",
+    title: "Billing",
+    description: "Where should invoices go?",
+    fields: 2,
+    // Only paid plans need billing details: picking Team or Business adds this step.
+    when: (v) => v.plan === "team" || v.plan === "business",
+    validate: (v) => {
+      const e: WizardErrors<WorkspaceValues> = {};
+      if (!v.billingEmail.trim()) e.billingEmail = "Enter the email that should get invoices.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.billingEmail.trim())) e.billingEmail = "Enter a valid email, like billing@example.com.";
+      return e;
+    },
+    summary: (v) => [
+      { label: "Invoices to", value: v.billingEmail },
+      { label: "VAT number", value: v.vatNumber || "None" },
+    ],
+    render: ({ values, setValue, errors, field, errorId }) => (
+      <div className="grid gap-4">
+        <WizardField label="Billing email" htmlFor={field("billingEmail").id} error={errors.billingEmail} errorId={errorId("billingEmail")}>
+          <input
+            {...field("billingEmail")}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={values.billingEmail}
+            onChange={(e) => setValue("billingEmail", e.target.value)}
+            placeholder="billing@example.com"
+            className={wizardInputClass}
+          />
+        </WizardField>
+        <WizardField
+          label="VAT number (optional)"
+          htmlFor={field("vatNumber").id}
+          error={errors.vatNumber}
+          errorId={errorId("vatNumber")}
+          hint="Only if your company is VAT-registered."
+        >
+          <input
+            {...field("vatNumber")}
+            value={values.vatNumber}
+            onChange={(e) => setValue("vatNumber", e.target.value)}
+            className={wizardInputClass}
+          />
+        </WizardField>
+      </div>
+    ),
   },
 ];
 
@@ -247,7 +300,7 @@ function PlanPicker({
               </span>
               <span>
                 <span className="text-xl font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">{p.price}</span>{" "}
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">{p.per}</span>
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">{p.per}</span>
               </span>
               <span className="text-[13px] text-zinc-600 dark:text-zinc-400">{p.blurb}</span>
             </label>
@@ -286,6 +339,7 @@ export function CreateWorkspaceDemo() {
           initialValues={INITIAL}
           onSubmit={onSubmit}
           showReview
+          persistKey="lofi-wizard-demo"
           labels={{ submit: "Create workspace", submitting: "Creating…", validating: "Checking name…" }}
           successTitle="Your workspace is ready"
           successDescription={(v) => (
@@ -299,10 +353,11 @@ export function CreateWorkspaceDemo() {
         <aside className="flex min-w-0 flex-col gap-3 rounded-xl border border-dashed border-zinc-300 p-4 text-sm dark:border-zinc-700">
           <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Try it</p>
           <ul className="list-disc space-y-1.5 pl-4 text-[13px] text-zinc-600 marker:text-zinc-400 dark:text-zinc-400">
-            <li>Press Continue with empty fields: focus jumps to the first error.</li>
+            <li>Pick Team or Business: a Billing step appears (and is announced). Starter removes it.</li>
+            <li>Fill a step or two, then reload the page: it offers to resume your draft.</li>
+            <li>The time left starts as a guess and adapts to how fast you go.</li>
             <li>Name the workspace “acme” to see the async check fail.</li>
             <li>On Review, use Edit, then “Save and review” to jump back.</li>
-            <li>Completed steps in the header are clickable.</li>
           </ul>
           <label htmlFor={failId} className="flex min-h-10 cursor-pointer items-center gap-2.5 text-[13px] text-zinc-700 dark:text-zinc-300">
             <input

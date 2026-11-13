@@ -18,26 +18,53 @@ const EXPENSES: DonutDatum[] = [
   { label: "Utilities", value: 185 },
   { label: "Health", value: 120 },
   { label: "Subscriptions", value: 64 },
+  { label: "Gifts", value: 45 },
+  { label: "Books", value: 38 },
+];
+
+/* The same budget a month earlier: Dining out rose, Transport fell, Gifts is new. */
+const AUGUST: DonutDatum[] = [
+  { label: "Rent", value: 1650 },
+  { label: "Groceries", value: 505 },
+  { label: "Savings", value: 700 },
+  { label: "Dining out", value: 240 },
+  { label: "Transport", value: 290 },
+  { label: "Utilities", value: 176 },
+  { label: "Health", value: 95 },
+  { label: "Subscriptions", value: 64 },
+  { label: "Books", value: 22 },
 ];
 
 export function ExpensesDemo() {
   const [hidden, setHidden] = useState<string[]>([]);
+  const [compare, setCompare] = useState(true);
   const spent = EXPENSES.filter((d) => !hidden.includes(d.label)).reduce((a, d) => a + d.value, 0);
 
   return (
     <div className="w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">September expenses</p>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Click a category to leave it out of the total.</p>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Small categories are grouped into Other: open it to see them. Click a category to leave it out.
+          </p>
         </div>
-        <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
-          showing {usd.format(spent)} · hidden: {hidden.length ? hidden.join(", ") : "none"}
-        </p>
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+          <input
+            type="checkbox"
+            checked={compare}
+            onChange={(e) => setCompare(e.target.checked)}
+            className="size-4 accent-indigo-600"
+          />
+          Compare with August
+        </label>
       </div>
       <DonutChart
         label="September expenses by category"
         data={EXPENSES}
+        previous={compare ? AUGUST : undefined}
+        previousLabel="August"
+        groupBelow={0.04}
         format={(v) => usd.format(v)}
         centerLabel="spent this month"
         legendPosition="right"
@@ -45,6 +72,9 @@ export function ExpensesDemo() {
         thickness={34}
         onHiddenChange={setHidden}
       />
+      <p className="mt-4 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+        showing {usd.format(spent)} · hidden: {hidden.length ? hidden.join(", ") : "none"}
+      </p>
     </div>
   );
 }

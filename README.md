@@ -1,5 +1,7 @@
 # Component Gallery
 
+[![CI](https://github.com/sayan30082000/LofiStack-90-day-challenge/actions/workflows/ci.yml/badge.svg)](https://github.com/sayan30082000/LofiStack-90-day-challenge/actions/workflows/ci.yml)
+
 ## Live Link: https://lofistack-sayan.netlify.app
 
 Reusable React + Tailwind components built for the LofiStack 90 Day Build Challenge.
@@ -16,8 +18,8 @@ All 30 components of the 90 day plan, 2 per week.
 |---|---|---|---|---|
 | 01 | 49 | Tree View | table | [/components/tree-view](https://lofistack-sayan.netlify.app/components/tree-view) |
 | 01 | 54 | Typing Indicator | loader | [/components/typing-indicator](https://lofistack-sayan.netlify.app/components/typing-indicator) |
-| 02 | 9 | Password Strength Input | input | [/components/password-strength-input](https://lofistack-sayan.netlify.app/components/password-strength-input) |
-| 02 | 25 | Flip Card | card | [/components/flip-card](https://lofistack-sayan.netlify.app/components/flip-card) |
+| 02 | 71 | Bangla Phonetic Input | input | [/components/bangla-phonetic-input](https://lofistack-sayan.netlify.app/components/bangla-phonetic-input) |
+| 02 | 72 | Tear-off Ticket Card | card | [/components/ticket-card](https://lofistack-sayan.netlify.app/components/ticket-card) |
 | 03 | 40 | Animated Tabs | navbar | [/components/animated-tabs](https://lofistack-sayan.netlify.app/components/animated-tabs) |
 | 03 | 51 | Skeleton Loader Kit | loader | [/components/skeleton](https://lofistack-sayan.netlify.app/components/skeleton) |
 | 04 | 23 | Pricing Cards | card | [/components/pricing-cards](https://lofistack-sayan.netlify.app/components/pricing-cards) |
@@ -49,7 +51,8 @@ All 30 components of the 90 day plan, 2 per week.
 
 - **Docs:** [docs/](docs/README.md) has one page per released component, generated from the TypeScript props (types, defaults, JSDoc) by `npm run docs`.
 - **Tests:** `npm test` runs the Vitest + Testing Library suite in `tests/`.
-- **Accessibility:** `npm run a11y` audits the running site with axe-core (WCAG 2.2 AA) in Chrome, light and dark, at 375px and 1280px, and writes [docs/a11y-report.md](docs/a11y-report.md). Set `BASE_URL` to audit the live site.
+- **Accessibility:** `npm run a11y` audits the running site with axe-core (WCAG 2.2 AA) in Chrome, light and dark, at 375px and 1280px, and writes [docs/a11y-report.md](docs/a11y-report.md). Set `BASE_URL` to audit the live site, or `ONLY=<slug>` for one page.
+- **CI:** [.github/workflows/ci.yml](.github/workflows/ci.yml) runs all of the above on every push and pull request: type-check, lint, tests, a check that `docs/` is current, a production build and the browser audit. The report lands in the run summary.
 
 ## Run locally
 
