@@ -37,7 +37,7 @@ import { OtpInput } from "@/components/ui/otp-input";
 | `name` | `string` | — | Submitted with forms through a hidden input. |
 | `size` | `"md" \| "lg"` | `"md"` | — |
 | `smartPaste` | `boolean` | `true` | Pull the code out of a pasted SMS or email ("Your code is 482 913…"). |
-| `webOtp` | `boolean` | `true` | On Android Chrome, read the code straight from the SMS with the WebOTP API. |
+| `webOtp` | `boolean` | `true` | On Android Chrome, read the code straight from the SMS with the WebOTP API. The request starts when an input is focused; only one input on the page listens at a time. |
 | `expiresAt` | `number` | — | When the code stops working (epoch ms). Shows a countdown and locks the boxes after. |
 | `onExpire` | `() => void` | — | Called once when expiresAt passes. |
 | `onResend` | `() => void \| Promise<void>` | — | Shows a Resend button after a cooldown. Return a promise to show a spinner. |

@@ -54,14 +54,16 @@ jobs:
       - name: Build
         run: npm run build
 
-      # The audit drives the Google Chrome that GitHub's Ubuntu runners already have.
-      - name: Accessibility audit (axe, light/dark, 375/1280px)
+      # Both checks drive the Google Chrome that GitHub's Ubuntu runners already have.
+      - name: Hydration check and accessibility audit
         run: |
           npm start -- --port 3000 > server.log 2>&1 &
           for i in $(seq 1 60); do
             curl -sf http://localhost:3000/ > /dev/null && break
             sleep 1
           done
+          # Every page must hydrate even with the comment Netlify injects into <head>.
+          npm run check:hydration
           npm run a11y
 
       - name: Audit report in the run summary

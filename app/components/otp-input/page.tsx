@@ -144,7 +144,7 @@ export default function Page() {
         { name: "name", type: "string", description: "Adds a hidden input with the code for native form posts." },
         { name: "size", type: '"md" | "lg"', default: '"md"', description: "Box size. Both are at least 40px wide and 48px tall." },
         { name: "smartPaste", type: "boolean", default: "true", description: "When pasted text looks like a message, find the code in it with extractOtp: digits split by a space or dash count, the candidate nearest a word like code / OTP / কোড wins, and longer numbers (phones, amounts) are never cut down to fit." },
-        { name: "webOtp", type: "boolean", default: "true", description: "On browsers with the WebOTP API (Android Chrome), read the code from the incoming SMS. Aborted on unmount." },
+        { name: "webOtp", type: "boolean", default: "true", description: "On browsers with the WebOTP API (Android Chrome), read the code from the incoming SMS. Starts when the input is focused; only one input per page listens (a new one takes over), and it stops on unmount." },
         { name: "expiresAt / onExpire", type: "number / () => void", description: "Epoch ms when the code stops working. Shows a countdown (amber in the last 30s), then locks the boxes and calls onExpire once." },
         { name: "onResend", type: "() => void | Promise<void>", description: "Adds a Resend button after a cooldown. A promise shows a spinner." },
         { name: "resendCooldowns", type: "number[]", default: "[30, 60, 120]", description: "Seconds to wait before each resend; the last value repeats." },

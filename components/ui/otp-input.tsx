@@ -56,7 +56,10 @@ export interface OtpInputProps {
   size?: "md" | "lg";
   /** Pull the code out of a pasted SMS or email ("Your code is 482 913…"). */
   smartPaste?: boolean;
-  /** On Android Chrome, read the code straight from the SMS with the WebOTP API. */
+  /**
+   * On Android Chrome, read the code straight from the SMS with the WebOTP API. The request starts
+   * when an input is focused; only one input on the page listens at a time.
+   */
   webOtp?: boolean;
   /** When the code stops working (epoch ms). Shows a countdown and locks the boxes after. */
   expiresAt?: number;
@@ -93,6 +96,32 @@ export const DEFAULT_OTP_LABELS: OtpLabels = {
   attemptsLeft: (n) => (n === 1 ? "1 attempt left" : `${n} attempts left`),
   filledFrom: (s) => (s === "sms" ? "Code filled in from your SMS." : "Code found in the pasted message."),
 };
+
+/** The one WebOTP request a page may have pending, whichever input started it. */
+let activeWebOtp: AbortController | null = null;
+
+/**
+ * Starts a WebOTP request (Android Chrome reads the code from the SMS), cancelling any other
+ * input's pending one first. Returns its controller, or null where WebOTP isn't available.
+ */
+function requestWebOtp(onCode: (code: string) => void, onSettled: (ac: AbortController) => void): AbortController | null {
+  if (typeof window === "undefined" || !("OTPCredential" in window)) return null;
+  activeWebOtp?.abort();
+  const ac = new AbortController();
+  activeWebOtp = ac;
+  (navigator.credentials.get({ otp: { transport: ["sms"] }, signal: ac.signal } as CredentialRequestOptions) as Promise<
+    (Credential & { code?: string }) | null
+  >)
+    .then((cred) => cred?.code && onCode(cred.code))
+    .catch(() => {
+      // Aborted, unsupported or no SMS: typing still works.
+    })
+    .finally(() => {
+      if (activeWebOtp === ac) activeWebOtp = null;
+      onSettled(ac);
+    });
+  return ac;
+}
 
 const CODE_WORDS = /(code|otp|pin|passcode|verification|verify|one[- ]time|কোড|ওটিপি)/i;
 
@@ -334,18 +363,31 @@ export function OtpInput({
       setNotice(L.filledFrom("sms"));
     };
   });
+  // Chrome allows one pending WebOTP request per page. Requesting from every input on mount made
+  // several inputs start and abort requests against each other until the tab crashed, so the
+  // request starts when this input is focused (someone is about to enter a code) and takes over
+  // from any other input's request.
+  const ownRequest = useRef<AbortController | null>(null);
+  const startWebOtp = () => {
+    if (!webOtp || disabled || readOnly || ownRequest.current) return;
+    ownRequest.current = requestWebOtp(
+      (code) => fillRef.current(code),
+      (ac) => {
+        if (ownRequest.current === ac) ownRequest.current = null;
+      },
+    );
+  };
+  // Stop listening when WebOTP is turned off, the input is disabled, or it unmounts.
   useEffect(() => {
-    if (!webOtp || disabled || typeof window === "undefined" || !("OTPCredential" in window)) return;
-    const ac = new AbortController();
-    (navigator.credentials.get({ otp: { transport: ["sms"] }, signal: ac.signal } as CredentialRequestOptions) as Promise<
-      (Credential & { code?: string }) | null
-    >)
-      .then((cred) => cred?.code && fillRef.current(cred.code))
-      .catch(() => {
-        // Aborted, unsupported or no SMS: typing still works.
-      });
-    return () => ac.abort();
+    if (webOtp && !disabled) return;
+    ownRequest.current?.abort();
   }, [webOtp, disabled]);
+  useEffect(
+    () => () => {
+      ownRequest.current?.abort();
+    },
+    [],
+  );
 
   const onKeyDown = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
     switch (e.key) {
@@ -460,6 +502,7 @@ export function OtpInput({
                   onKeyDown={(e) => onKeyDown(i, e)}
                   onPaste={(e) => onPaste(i, e)}
                   onFocus={(e) => {
+                    startWebOtp();
                     // Boxes fill in order: jump to the first empty box.
                     if (i > value.length && !programmatic.current) {
                       focusBox(value.length);
