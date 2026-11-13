@@ -97,6 +97,15 @@ export const agentLogs: AgentLog[] = [
       "From a 55-minute team meeting: 15 decisions (2 tentative), 28 action items and 14 open questions. Only 5 tasks had a date said aloud and 7 had no clear owner, so it flagged those instead of guessing. Against Fireflies' own list it found 10 tasks Fireflies missed (including the one approval a launch was waiting on) and 15 of Fireflies' 28 items that were wrong, duplicated, vague or already settled later in the meeting, e.g. a task given to the person who asked the question rather than the one who said \"I have to check that\". The transcript stays private; only these counts are public. Saved about an hour of note-taking and checking.",
     automated: true,
   },
+  {
+    week: 8,
+    task: "Automate the checks on every push with a GitHub Actions CI workflow",
+    agent: "Claude Code + GitHub Actions",
+    workflow: "Write a GitHub Actions workflow for this repo that runs on every push to main and every pull request: install with npm ci, type-check, lint, the Vitest suite, a check that the generated docs/ are up to date, a production build, then start the built site and run the full axe accessibility audit (npm run a11y) in the Chrome the runner already has. Put the audit report in the run summary, keep it as an artifact, and add a CI badge to the README. Then push it, watch the first runs and fix whatever fails.",
+    result:
+      "Run #1 failed at the type-check after 1 minute: in a fresh checkout the route types (LayoutProps) that next build generates don't exist yet, which never shows up locally. It reproduced the failure in a clean clone, fixed it with next typegen before tsc, and checked lint, the 248 tests and the docs check in that clone before pushing. Run #2 passed every step in 4 min 23 s, including the accessibility audit (136 page/state runs, no violations). Every push is now checked without me running anything. Saves about 20 minutes per release.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -156,9 +165,9 @@ Add an "npm test" script, run the tests, fix any real bug you find in the compon
   {
     week: 8,
     kind: "Workflow automation",
-    task: "Post every new Netlify deploy of the gallery to a Discord channel",
-    agent: "n8n (or Zapier)",
-    prompt: `Workflow: Netlify "deploy succeeded" outgoing webhook → n8n Webhook node → Set node (site name, deploy URL, commit message, time) → Discord node posting "New gallery deploy: <commit message> · <deploy URL>" to my channel. Add an IF node so failed deploys post a red alert instead.`,
+    task: "Automate the checks on every push with a GitHub Actions CI workflow",
+    agent: "Claude Code + GitHub Actions",
+    prompt: `Write a GitHub Actions workflow for this repo that runs on every push to main and every pull request: install with npm ci, type-check, lint, the Vitest suite, a check that the generated docs/ are up to date, a production build, then start the built site and run the full axe accessibility audit (npm run a11y) in the Chrome the runner already has. Put the audit report in the run summary, keep it as an artifact, and add a CI badge to the README. Then push it, watch the first runs and fix whatever fails.`,
   },
   {
     week: 9,
