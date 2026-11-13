@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import * as activityHeatmap from "@/app/components/activity-heatmap/demos";
 import * as animatedTabs from "@/app/components/animated-tabs/demos";
 import * as commandPalette from "@/app/components/command-palette/demos";
+import * as breadcrumbs from "@/app/components/breadcrumbs/demos";
 import * as banglaInput from "@/app/components/bangla-phonetic-input/demos";
 import * as confirmDialog from "@/app/components/confirm-dialog/demos";
 import * as dataTable from "@/app/components/data-table/demos";
@@ -16,6 +17,7 @@ import * as fileDropzone from "@/app/components/file-dropzone/demos";
 import * as otpInput from "@/app/components/otp-input/demos";
 import * as pricingCards from "@/app/components/pricing-cards/demos";
 import * as skeleton from "@/app/components/skeleton/demos";
+import * as toastDemos from "@/app/components/toast/demos";
 import * as ticketCard from "@/app/components/ticket-card/demos";
 import * as tiltCard from "@/app/components/tilt-card/demos";
 import * as treeView from "@/app/components/tree-view/demos";
@@ -45,6 +47,8 @@ const PAGES: Record<string, Record<string, unknown>> = {
   "donut-chart": donutChart,
   "newsletter-signup": newsletterSignup,
   "data-table": dataTable,
+  toast: toastDemos,
+  breadcrumbs,
 };
 
 const demos = Object.entries(PAGES).flatMap(([page, mod]) =>

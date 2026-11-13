@@ -34,6 +34,43 @@ function Visited({ value }: { value: string | null }) {
 
 const folder = <Folder className="text-sky-600 dark:text-sky-400" />;
 
+/* ---------- Sibling switcher ---------- */
+
+const WORKSPACES = ["Acme Studio", "Northwind", "Personal"].map((name) => ({
+  label: name,
+  href: `/w/${name.toLowerCase().replace(/\s+/g, "-")}`,
+}));
+const PROJECTS = [
+  "Lofi Gallery", "Marketing site", "Mobile app", "Design system", "Billing service", "Data warehouse",
+  "Docs", "Status page", "Onboarding", "Analytics", "Help center", "Brand kit",
+].map((name) => ({ label: name, href: `/w/acme-studio/${name.toLowerCase().replace(/\s+/g, "-")}` }));
+const SETTINGS = ["General", "Members", "Billing", "Integrations", "Danger zone"].map((name) => ({
+  label: name,
+  href: `/w/acme-studio/lofi-gallery/settings/${name.toLowerCase().replace(/\s+/g, "-")}`,
+}));
+
+export function SwitcherDemo() {
+  const { visited, renderLink } = useDemoLinks();
+  const items: BreadcrumbItem[] = [
+    { ...WORKSPACES[0], siblings: WORKSPACES },
+    { ...PROJECTS[0], siblings: PROJECTS },
+    { label: "Settings", href: "/w/acme-studio/lofi-gallery/settings" },
+    { label: SETTINGS[2].label, siblings: SETTINGS },
+  ];
+  return (
+    <div className="flex w-full max-w-3xl flex-col gap-4">
+      <div className="rounded-xl border border-zinc-200 bg-white px-2 py-1 dark:border-zinc-800 dark:bg-zinc-900">
+        <Breadcrumbs items={items} separator="slash" maxItems={6} renderLink={renderLink} />
+      </div>
+      <Visited value={visited} />
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        Each ▾ lists the other items at that level: switch workspace, jump to another of 12 projects (type to filter), or move to
+        another settings page, without going up first. Arrow keys work in every menu; Escape returns to the ▾.
+      </p>
+    </div>
+  );
+}
+
 const DEEP_PATH: BreadcrumbItem[] = [
   { label: "lofistack", href: "/files" },
   { label: "component-gallery", href: "/files/component-gallery", icon: folder },

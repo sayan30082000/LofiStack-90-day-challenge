@@ -49,6 +49,26 @@ export interface ToastOptions {
   onDismiss?: (id: string) => void;
   /** Called when the toast closes because its timer ran out. */
   onAutoClose?: (id: string) => void;
+  /**
+   * Toasts with the same group merge into one instead of stacking, e.g. "upload". Without a group,
+   * a toast with exactly the same type and text as one on screen merges with it (shown as ×2, ×3…).
+   * Pass false to always stack.
+   */
+  group?: string | false;
+  /** Message of a merged toast, from how many were merged and the newest message. */
+  groupMessage?: (count: number, latest: ReactNode) => ReactNode;
+}
+
+/** Options for toast.undo(). */
+export interface ToastUndoOptions extends Omit<ToastOptions, "action" | "group" | "groupMessage"> {
+  /** Puts things back. Runs instead of onCommit when Undo (or Ctrl/⌘+Z) is pressed in time. */
+  onUndo: () => void;
+  /** Makes the change permanent. Runs once when the toast closes any other way. */
+  onCommit?: () => void;
+  /** Text of the undo button. */
+  undoLabel?: string;
+  /** Message shown after undoing. Empty shows nothing. */
+  undoneMessage?: ReactNode;
 }
 
 /** Messages for toast.promise. success and error can be functions of the result. */
@@ -64,8 +84,11 @@ export interface ToastProps {
   position?: ToastPosition;
   /** Toasts visible at once. Older ones wait and move up as newer ones close. */
   max?: number;
-  /** Default auto-dismiss time in ms. Loading toasts never auto-dismiss. */
-  duration?: number;
+  /**
+   * Default auto-dismiss time in ms, or "auto" to give each toast time to be read: about 0.3s per
+   * word on top of 3s, between 4s and 15s. Loading toasts never auto-dismiss.
+   */
+  duration?: number | "auto";
   /** Always show the stack expanded instead of only on hover or focus. */
   expand?: boolean;
   /** Show a close button on every dismissible toast. */
@@ -96,6 +119,8 @@ export interface ToastProps {
   zIndex?: number;
   /** Classes for every toast card. */
   toastClassName?: string;
+  /** Ctrl+Z / ⌘Z undoes the newest toast.undo() on screen (not while typing in a field). */
+  undoShortcut?: boolean;
 }
 
 interface ToastRecord extends Omit<ToastOptions, "id"> {
@@ -107,6 +132,13 @@ interface ToastRecord extends Omit<ToastOptions, "id"> {
   removing: boolean;
   /** Direction of the swipe that closed it, for the exit animation. */
   swipe: number;
+  /** How many toasts merged into this one. */
+  count: number;
+  /** The message already says how many (groupMessage), so no ×count badge. */
+  summarised: boolean;
+  /** Key that merges toasts: the group, or type + text. null never merges. */
+  mergeKey: string | null;
+  undo?: { onUndo: () => void; onCommit?: () => void; label: string; undoneMessage: ReactNode };
 }
 
 interface ToastState {
@@ -136,25 +168,62 @@ function subscribe(listener: () => void) {
   };
 }
 
-function show(type: ToastType, message: ReactNode, options: ToastOptions = {}): string {
-  const { id: givenId, ...rest } = options;
-  const id = givenId ?? `toast-${++counter}`;
+/** Plain text of a message, for merging and reading time. */
+function textOf(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (typeof node === "object" && "props" in node) return textOf((node.props as { children?: ReactNode }).children);
+  return "";
+}
+
+/** What makes two toasts the same: their group, or their type and text. null never merges. */
+export function toastMergeKey(type: ToastType, message: ReactNode, group?: string | false): string | null {
+  if (group === false || type === "loading") return null;
+  if (group) return `group:${group}`;
+  const text = textOf(message).trim();
+  return text ? `${type}:${text}` : null;
+}
+
+/** Time to read a toast: 3s plus about 0.3s per word, kept between 4s and 15s. */
+export function readingTime(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.min(15000, Math.max(4000, 3000 + words * 300));
+}
+
+/** Ids of undo toasts whose Undo was pressed, so closing them doesn't commit. */
+const undone = new Set<string>();
+
+function show(type: ToastType, message: ReactNode, options: ToastOptions = {}, undo?: ToastRecord["undo"]): string {
+  const { id: givenId, group, groupMessage, ...rest } = options;
+  const mergeKey = givenId || undo ? null : toastMergeKey(type, message, group);
+  const twin = mergeKey ? store.toasts.find((t) => t.mergeKey === mergeKey && !t.removing) : undefined;
+  const id = givenId ?? twin?.id ?? `toast-${++counter}`;
   const existing = store.toasts.find((t) => t.id === id && !t.removing);
+  const count = twin ? twin.count + 1 : 1;
+  const shown = twin && groupMessage ? groupMessage(count, message) : message;
   const record: ToastRecord = {
     ...rest,
     id,
     type,
-    message,
+    message: shown,
     version: (existing?.version ?? 0) + 1,
     removing: false,
     swipe: 0,
+    count,
+    summarised: Boolean(twin && groupMessage),
+    mergeKey,
+    undo,
   };
-  const toasts = existing
-    ? store.toasts.map((t) => (t.id === id ? record : t))
-    : [record, ...store.toasts.filter((t) => t.id !== id)];
+  // A merged toast moves to the front with its timer restarted.
+  const toasts = twin
+    ? [record, ...store.toasts.filter((t) => t.id !== id)]
+    : existing
+      ? store.toasts.map((t) => (t.id === id ? record : t))
+      : [record, ...store.toasts.filter((t) => t.id !== id)];
   emit({
     toasts,
-    announcement: { message, description: rest.description, assertive: type === "error", key: ++counter },
+    announcement: { message: shown, description: rest.description, assertive: type === "error", key: ++counter },
   });
   return id;
 }
@@ -170,6 +239,8 @@ function close(id: string | undefined, reason: "dismiss" | "auto", swipe = 0) {
   for (const t of targets) {
     if (reason === "auto") t.onAutoClose?.(t.id);
     else t.onDismiss?.(t.id);
+    // An undo toast that closes without Undo makes its change permanent.
+    if (t.undo && !undone.delete(t.id)) t.undo.onCommit?.();
   }
   setTimeout(() => {
     emit({ ...store, toasts: store.toasts.filter((t) => !(ids.has(t.id) && t.removing)) });
@@ -207,7 +278,27 @@ export const toast = Object.assign(baseToast, {
   },
   /** Close one toast by id, or all of them. */
   dismiss: (id?: string) => close(id, "dismiss"),
+  /**
+   * For changes that are easy to take back, e.g. "Archived 3 emails": shows an Undo button. If
+   * Undo (or Ctrl/⌘+Z) is pressed before the toast closes, onUndo runs; otherwise onCommit runs
+   * when it closes. Returns the toast id.
+   */
+  undo: (message: ReactNode, options: ToastUndoOptions) => {
+    const { onUndo, onCommit, undoLabel = "Undo", undoneMessage = "Undone", ...rest } = options;
+    return show("default", message, rest, { onUndo, onCommit, label: undoLabel, undoneMessage });
+  },
 });
+
+/** Undo a toast.undo(): runs its onUndo instead of onCommit and closes it. */
+function runUndo(id: string) {
+  const t = store.toasts.find((x) => x.id === id && !x.removing && x.undo);
+  if (!t?.undo) return false;
+  undone.add(id);
+  t.undo.onUndo();
+  close(id, "dismiss");
+  if (t.undo.undoneMessage) show("info", t.undo.undoneMessage, { duration: 2500, group: false });
+  return true;
+}
 
 /* ============================================================
  * Small external stores
@@ -224,6 +315,8 @@ const subscribeClasses = (cb: () => void) => {
   mo.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ["class"] });
   return () => mo.disconnect();
 };
+
+const subscribeNever = () => () => {};
 
 /** The portal lives in <body>, so copy the light/dark override from wherever <Toaster /> is mounted. */
 function themeOf(el: Element | null): "" | "light" | "dark" {
@@ -300,7 +393,7 @@ function computeLayout(
 export function Toaster({
   position = "bottom-right",
   max = 3,
-  duration = 5000,
+  duration = "auto",
   expand = false,
   closeButton = true,
   showProgress = true,
@@ -316,11 +409,17 @@ export function Toaster({
   icons,
   zIndex = 100,
   toastClassName,
+  undoShortcut = true,
 }: ToastProps) {
   const { toasts, announcement } = useSyncExternalStore(subscribe, () => store, () => SERVER_STATE);
   const [anchor, setAnchor] = useState<HTMLSpanElement | null>(null);
   const theme = useSyncExternalStore(subscribeClasses, () => themeOf(anchor), () => "");
   const docHidden = useSyncExternalStore(subscribeVisibility, () => document.hidden, () => false);
+  const isMac = useSyncExternalStore(
+    subscribeNever,
+    () => /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent),
+    () => false,
+  );
 
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -353,6 +452,20 @@ export function Toaster({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [hotkey]);
+
+  // Ctrl+Z / ⌘Z undoes the newest undo toast, unless the person is typing (where it undoes text).
+  useEffect(() => {
+    if (!undoShortcut) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "z") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      const latest = store.toasts.find((t) => t.undo && !t.removing);
+      if (latest && runUndo(latest.id)) e.preventDefault();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [undoShortcut]);
 
   /** After a focused toast closes, move focus to its neighbour, or back to where F8 was pressed. */
   const moveFocusFrom = useCallback((li: HTMLElement) => {
@@ -397,7 +510,7 @@ export function Toaster({
     <>
       <span ref={setAnchor} hidden />
       <style href="lofi-toast" precedence="default">
-        {`@keyframes lofi-toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}
+        {`@keyframes lofi-toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } } @keyframes lofi-toast-bump { 40% { transform: scale(1.25); } }`}
       </style>
       {anchor &&
         createPortal(
@@ -447,7 +560,15 @@ export function Toaster({
                   expanded={expanded}
                   isBottom={isBottom}
                   paused={paused}
-                  duration={t.duration ?? (t.type === "loading" ? Infinity : duration)}
+                  duration={
+                    t.duration ??
+                    (t.type === "loading"
+                      ? Infinity
+                      : duration === "auto"
+                        ? readingTime(`${textOf(t.message)} ${textOf(t.description)}`)
+                        : duration)
+                  }
+                  undoKeys={undoShortcut ? (isMac ? "⌘Z" : "Ctrl+Z") : null}
                   closeButton={closeButton}
                   showProgress={showProgress}
                   dismissLabel={dismissLabel}
@@ -488,6 +609,8 @@ interface ToastItemProps {
   className?: string;
   onHeight: (id: string, height: number) => void;
   moveFocusFrom: (li: HTMLElement) => void;
+  /** Shortcut hint shown on the Undo button, or null. */
+  undoKeys: string | null;
 }
 
 function ToastItem({
@@ -507,6 +630,7 @@ function ToastItem({
   className,
   onHeight,
   moveFocusFrom,
+  undoKeys,
 }: ToastItemProps) {
   const uid = useId();
   const liRef = useRef<HTMLLIElement>(null);
@@ -626,6 +750,19 @@ function ToastItem({
         <div className="min-w-0 flex-1 py-1">
           <p id={`${uid}-title`} className="text-sm font-medium leading-5 break-words">
             {t.message}
+            {t.count > 1 && !t.summarised && (
+              <>
+                <span
+                  aria-hidden
+                  // Remounts on each merge so the bump plays again.
+                  key={t.count}
+                  className="ml-1.5 inline-flex rounded-full bg-zinc-100 px-1.5 align-[1px] text-xs font-semibold tabular-nums text-zinc-700 motion-safe:animate-[lofi-toast-bump_260ms_ease-out] dark:bg-zinc-800 dark:text-zinc-200"
+                >
+                  ×{t.count}
+                </span>
+                <span className="sr-only">, {t.count} times</span>
+              </>
+            )}
           </p>
           {t.description && (
             <p id={`${uid}-desc`} className="mt-0.5 text-sm leading-5 break-words text-zinc-600 dark:text-zinc-400">
@@ -633,6 +770,21 @@ function ToastItem({
             </p>
           )}
         </div>
+        {t.undo && (
+          <button
+            type="button"
+            onClick={() => runUndo(t.id)}
+            aria-keyshortcuts={undoKeys ? "Control+Z Meta+Z" : undefined}
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold text-indigo-700 outline-none transition-colors motion-reduce:transition-none hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 active:bg-indigo-100 dark:text-indigo-300 dark:hover:bg-indigo-500/15 dark:active:bg-indigo-500/25"
+          >
+            {t.undo.label}
+            {undoKeys && (
+              <kbd className="hidden rounded border border-indigo-200 px-1 font-sans text-[11px] font-medium text-indigo-700 sm:inline dark:border-indigo-500/40 dark:text-indigo-300">
+                {undoKeys}
+              </kbd>
+            )}
+          </button>
+        )}
         {t.action && (
           <button
             type="button"

@@ -10,7 +10,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { ArrowLeft, ChevronRight, CornerDownRight, Ellipsis, House } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, CornerDownRight, Ellipsis, House, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface BreadcrumbItem {
@@ -22,6 +22,11 @@ export interface BreadcrumbItem {
   icon?: ReactNode;
   /** Shown as muted, non-interactive text (e.g. a folder the user can't open). */
   disabled?: boolean;
+  /**
+   * Other items at the same level, e.g. the other projects next to this one. Adds a ▾ menu so
+   * people can jump sideways without going up first. Include this item to mark it as current.
+   */
+  siblings?: BreadcrumbItem[];
 }
 
 /** What `renderLink` receives. Spread it onto your link component. */
@@ -70,6 +75,14 @@ export interface BreadcrumbsProps {
   loadingLabel?: string;
   /** Number of skeleton crumbs. */
   loadingCount?: number;
+  /** Accessible name of a sibling menu button and list. */
+  siblingsLabel?: (item: BreadcrumbItem) => string;
+  /** Sibling menus with more items than this get a filter box. */
+  siblingFilterThreshold?: number;
+  /** Placeholder and name of the filter box. */
+  siblingFilterLabel?: string;
+  /** Shown when the filter matches nothing. */
+  noMatchesLabel?: string;
   className?: string;
 }
 
@@ -111,10 +124,11 @@ interface CrumbProps {
   renderLink: (props: BreadcrumbLinkProps) => ReactNode;
   /** Align the tooltip to the right edge (for the last crumb). */
   alignEnd: boolean;
+  siblingMenu: Omit<SiblingMenuProps, "item" | "siblings" | "label" | "alignEnd"> & { label: (item: BreadcrumbItem) => string };
 }
 
 /** One crumb. Measures its own label so a tooltip appears only when the text is actually cut off. */
-function Crumb({ item, icon, hideLabel, current, maxLabelWidth, renderLink, alignEnd }: CrumbProps) {
+function Crumb({ item, icon, hideLabel, current, maxLabelWidth, renderLink, alignEnd, siblingMenu }: CrumbProps) {
   const labelRef = useRef<HTMLSpanElement>(null);
   const [truncated, setTruncated] = useState(false);
 
@@ -174,9 +188,222 @@ function Crumb({ item, icon, hideLabel, current, maxLabelWidth, renderLink, alig
     <li className="group/crumb relative flex min-w-0 items-center">
       {node}
       {tooltip}
+      {item.siblings && item.siblings.length > 1 && (
+        <SiblingMenu
+          item={item}
+          siblings={item.siblings}
+          label={siblingMenu.label(item)}
+          filterLabel={siblingMenu.filterLabel}
+          noMatchesLabel={siblingMenu.noMatchesLabel}
+          filterThreshold={siblingMenu.filterThreshold}
+          renderLink={siblingMenu.renderLink}
+          alignEnd={alignEnd}
+        />
+      )}
     </li>
   );
 }
+
+/** Case- and accent-insensitive "contains" for the sibling filter. */
+export function filterSiblings(items: BreadcrumbItem[], query: string): BreadcrumbItem[] {
+  const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const q = fold(query.trim());
+  return q ? items.filter((i) => fold(i.label).includes(q)) : items;
+}
+
+interface SiblingMenuProps {
+  item: BreadcrumbItem;
+  siblings: BreadcrumbItem[];
+  label: string;
+  filterLabel: string;
+  noMatchesLabel: string;
+  filterThreshold: number;
+  renderLink: (props: BreadcrumbLinkProps) => ReactNode;
+  alignEnd: boolean;
+}
+
+/**
+ * The ▾ next to a crumb: the other items at the same level (other projects, other folders), so
+ * people can move sideways without climbing up first. Long lists get a filter box.
+ */
+function SiblingMenu({ item, siblings, label, filterLabel, noMatchesLabel, filterThreshold, renderLink, alignEnd }: SiblingMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const menuId = useId();
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLInputElement>(null);
+  const withFilter = siblings.length > filterThreshold;
+  const shown = filterSiblings(siblings, query);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  const links = () => Array.from(panelRef.current?.querySelectorAll<HTMLElement>("a[href]") ?? []);
+  const focusLink = (i: number) => {
+    const els = links();
+    if (els.length) els[(i + els.length) % els.length].focus();
+  };
+  const openMenu = (focusLast = false) => {
+    setOpen(true);
+    setQuery("");
+    // After the panel renders: the filter box when there is one, else the first (or last) link.
+    setTimeout(() => (withFilter && !focusLast ? filterRef.current?.focus() : focusLink(focusLast ? -1 : 0)), 0);
+  };
+  const close = (returnFocus: boolean) => {
+    setOpen(false);
+    if (returnFocus) buttonRef.current?.focus();
+  };
+
+  const onButtonKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      openMenu(e.key === "ArrowUp");
+    } else if (e.key === "Escape" && open) {
+      e.preventDefault();
+      close(false);
+    }
+  };
+  const onPanelKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const els = links();
+    const i = els.indexOf(document.activeElement as HTMLElement);
+    let handled = true;
+    if (e.key === "ArrowDown") focusLink(i + 1);
+    else if (e.key === "ArrowUp") {
+      if (i <= 0 && withFilter) filterRef.current?.focus();
+      else focusLink(i - 1);
+    }
+    else if (e.key === "Home" && i >= 0) focusLink(0);
+    else if (e.key === "End" && i >= 0) focusLink(-1);
+    else if (e.key === "Escape") close(true);
+    else handled = false;
+    if (handled) e.preventDefault();
+  };
+
+  return (
+    <span
+      ref={wrapRef}
+      className="relative -ml-1 flex shrink-0 items-center"
+      onBlur={(e: FocusEvent<HTMLSpanElement>) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => (open ? close(false) : openMenu())}
+        onKeyDown={onButtonKey}
+        className={cn(
+          "inline-flex h-10 w-7 items-center justify-center rounded-md text-zinc-500 outline-none transition-colors motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-indigo-500 hover:bg-zinc-100 hover:text-zinc-900 active:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:active:bg-zinc-700",
+          open && "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100",
+        )}
+      >
+        <ChevronDown aria-hidden className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          ref={panelRef}
+          id={menuId}
+          onKeyDown={onPanelKey}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("a")) setOpen(false);
+          }}
+          className={cn(
+            "absolute top-full z-30 mt-1 w-max min-w-52 max-w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-zinc-200 bg-white p-1 shadow-lg shadow-zinc-900/10 motion-safe:animate-[lofi-breadcrumbs-in_140ms_ease-out] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-black/40",
+            alignEnd ? "right-0" : "left-0",
+          )}
+        >
+          {withFilter && (
+            <div className="relative p-1">
+              <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500 dark:text-zinc-400" />
+              <input
+                ref={filterRef}
+                type="search"
+                value={query}
+                aria-label={filterLabel}
+                placeholder={filterLabel}
+                autoComplete="off"
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    focusLink(0);
+                  }
+                }}
+                className="h-10 w-full rounded-lg border border-zinc-300 bg-white pl-8 pr-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-500 focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-400"
+              />
+            </div>
+          )}
+          <ul aria-label={label} className="max-h-72 overflow-y-auto">
+            {shown.map((s, i) => {
+              // The crumb itself: same label, and the same link when the crumb has one (the current page has none).
+              const isSelf = s.label === item.label && (!item.href || s.href === item.href);
+              const inner = (
+                <>
+                  {s.icon && (
+                    <span aria-hidden className="inline-flex shrink-0 [&>svg]:size-4">
+                      {s.icon}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                  {isSelf && <Check aria-hidden className="size-4 shrink-0 text-indigo-600 dark:text-indigo-400" />}
+                </>
+              );
+              const cls = cn(
+                "flex h-10 w-full min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm outline-none",
+                isSelf ? "font-medium text-zinc-900 dark:text-zinc-50" : "text-zinc-700 dark:text-zinc-300",
+              );
+              return (
+                <li key={`${s.label}-${i}`}>
+                  {s.href && !s.disabled ? (
+                    renderLink({
+                      href: s.href,
+                      item: s,
+                      className: cn(
+                        cls,
+                        "hover:bg-zinc-100 hover:text-zinc-900 focus-visible:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-indigo-500 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 dark:focus-visible:bg-zinc-800",
+                      ),
+                      children: (
+                        <>
+                          {inner}
+                          {isSelf && <span className="sr-only">, current</span>}
+                        </>
+                      ),
+                    })
+                  ) : (
+                    <span aria-disabled={s.disabled || undefined} className={cn(cls, "text-zinc-500 dark:text-zinc-400")}>
+                      {inner}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {shown.length === 0 && <p className="px-3 py-2.5 text-sm text-zinc-600 dark:text-zinc-400">{noMatchesLabel}</p>}
+          {/* Announces how many match while filtering. */}
+          {withFilter && (
+            <p role="status" className="sr-only">
+              {query ? `${shown.length} ${shown.length === 1 ? "match" : "matches"}` : ""}
+            </p>
+          )}
+        </div>
+      )}
+    </span>
+  );
+}
+
+
 
 interface OverflowMenuProps {
   hidden: BreadcrumbItem[];
@@ -331,8 +558,19 @@ export function Breadcrumbs({
   loading = false,
   loadingLabel = "Loading breadcrumb",
   loadingCount = 3,
+  siblingsLabel = (item) => `Other items next to ${item.label}`,
+  siblingFilterThreshold = 7,
+  siblingFilterLabel = "Filter…",
+  noMatchesLabel = "No matches",
   className,
 }: BreadcrumbsProps) {
+  const siblingMenu = {
+    label: siblingsLabel,
+    filterLabel: siblingFilterLabel,
+    noMatchesLabel,
+    filterThreshold: siblingFilterThreshold,
+    renderLink,
+  };
   if (loading) {
     return (
       <nav aria-label={label} aria-busy className={cn("w-full", className)}>
@@ -414,6 +652,7 @@ export function Breadcrumbs({
                 maxLabelWidth={maxLabelWidth}
                 renderLink={renderLink}
                 alignEnd={entry.index === total - 1 && total > 1}
+                siblingMenu={siblingMenu}
               />
             )}
           </Fragment>

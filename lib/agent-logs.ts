@@ -115,6 +115,15 @@ export const agentLogs: AgentLog[] = [
       "A sub-agent read 49 sources (official docs, GitHub, npm, bundlephobia) and wrote research/week-09-library-research.md: a comparison table, a section per library, 5 new ideas (Query Builder, Signature Pad, Keyboard Shortcuts Sheet, Image Hotspot Showcase, Scrollytelling Feature Section) and a not-verified list. Useful finds: shadcn/ui switched its default foundation to Base UI in July 2026 and added React Aria; whole-package sizes (gzip, before tree-shaking) are about 63 KB for Headless UI, 191 KB for Mantine core and 331 KB for Chakra. The two section ideas give me a replacement for my Week 14 Before/After Slider, which a teammate already built. Saved about 3 hours of reading.",
     automated: true,
   },
+  {
+    week: 10,
+    task: "Find and fix real errors on the live site: a hydration error on every page and a crash on the OTP page",
+    agent: "Claude Code + Chrome (playwright-core)",
+    workflow: "Visit every released page in Chrome (light/dark, 375/1280px), collect console errors, page errors and failed requests, then for each problem reproduce it locally, find the root cause by narrowing it down, fix it with the smallest change, prove the fix with a test that fails on the old code, and add a guard so it can't come back.",
+    result:
+      "Found two real bugs. 1) Every live page threw React error #418 (hydration mismatch), so React threw away the server HTML and re-rendered each page in the browser. The same build had no error locally, so it compared the live HTML with a local build, ruled out Netlify's HUD script by blocking and removing it, and found Netlify injects an HTML comment into <head>; removing just that comment made the error disappear. Fix: the layout no longer renders its own <head> (the theme script moved to the top of <body>, checked for no flash). 2) The OTP page crashed Chrome in development: each OTP input started a WebOTP request on mount, and any two on one page aborted each other until the tab died; fix: only the focused input asks. Guards: npm run check:hydration (now in CI) and a WebOTP test, both failing on the old code. Saved a day of guessing.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -188,9 +197,9 @@ Add an "npm test" script, run the tests, fix any real bug you find in the compon
   {
     week: 10,
     kind: "Debugging",
-    task: "Find and fix the cause of a failing build or console error",
+    task: "Find and fix real errors on the live site: a hydration error on every page and a crash on the OTP page",
     agent: "Claude Code",
-    prompt: `The Netlify build log / browser console shows this error (pasted below). Reproduce it locally, find the root cause, fix it with the smallest change, and explain in 3 sentences what was wrong and how the fix prevents it from coming back.`,
+    prompt: `Visit every released page in Chrome (light/dark, 375/1280px), collect console errors, page errors and failed requests, then for each problem reproduce it locally, find the root cause by narrowing it down, fix it with the smallest change, prove the fix with a test that fails on the old code, and add a guard so it can't come back.`,
   },
   {
     week: 11,

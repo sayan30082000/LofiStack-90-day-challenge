@@ -229,16 +229,17 @@ const EMAILS = [
 ];
 
 export function UndoDemo() {
+  // Hidden right away, but only "saved to the server" when the toast closes without Undo.
   const [archived, setArchived] = useState<string[]>([]);
+  const [saved, setSaved] = useState<string[]>([]);
   const inbox = EMAILS.filter((e) => !archived.includes(e.id));
 
   const archive = (email: (typeof EMAILS)[number]) => {
     setArchived((a) => [...a, email.id]);
-    toast("Email archived", {
-      id: `archive-${email.id}`,
+    toast.undo("Email archived", {
       description: email.subject,
-      duration: 6000,
-      action: { label: "Undo", onClick: () => setArchived((a) => a.filter((id) => id !== email.id)) },
+      onUndo: () => setArchived((a) => a.filter((id) => id !== email.id)),
+      onCommit: () => setSaved((list) => [...list, email.subject]),
     });
   };
 
@@ -254,7 +255,14 @@ export function UndoDemo() {
         <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
           <Inbox className="size-8 text-zinc-500 dark:text-zinc-400" aria-hidden />
           <p className="text-sm text-zinc-600 dark:text-zinc-400">Inbox zero. Nice.</p>
-          <button type="button" className={btn} onClick={() => setArchived([])}>
+          <button
+            type="button"
+            className={btn}
+            onClick={() => {
+              setArchived([]);
+              setSaved([]);
+            }}
+          >
             <RotateCcw className="size-4" aria-hidden /> Restore all
           </button>
         </div>
@@ -279,6 +287,55 @@ export function UndoDemo() {
           ))}
         </ul>
       )}
+      <p className="border-t border-zinc-200 px-4 py-2.5 font-mono text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-400" aria-live="polite">
+        saved to server: {saved.length ? saved.join(" · ") : "nothing yet (Undo or Ctrl/⌘+Z first, or wait)"}
+      </p>
+    </div>
+  );
+}
+
+/* ---------- Merging: repeats count up, groups summarise ---------- */
+
+export function MergeDemo() {
+  const [uploads, setUploads] = useState(0);
+  return (
+    <div className="flex w-full max-w-xl flex-col gap-4">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={btn} onClick={() => toast.success("Draft saved")}>
+          Save (press it a few times)
+        </button>
+        <button
+          type="button"
+          className={btn}
+          onClick={() => {
+            const n = uploads + 1;
+            setUploads(n);
+            toast.success(`photo-${n}.jpg uploaded`, {
+              group: "uploads",
+              groupMessage: (count) => `${count} photos uploaded`,
+              description: `Latest: photo-${n}.jpg`,
+            });
+          }}
+        >
+          Upload a photo
+        </button>
+        <button
+          type="button"
+          className={btn}
+          onClick={() =>
+            toast.info("Your export is ready", {
+              description:
+                "We bundled all 14 reports from September into one ZIP file. It stays available for seven days on the Exports page, and we also emailed you a link.",
+            })
+          }
+        >
+          Long message
+        </button>
+      </div>
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        Repeats of the same toast count up (Draft saved ×3) instead of stacking, uploads in the same group become one summary, and
+        the long message stays up longer: each toast gets time to be read.
+      </p>
     </div>
   );
 }

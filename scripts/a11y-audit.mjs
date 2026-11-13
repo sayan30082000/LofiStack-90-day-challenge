@@ -67,15 +67,16 @@ const STATES = {
           await p.getByRole("button", { name }).click();
         }
         // Issue chips (amber <li>s); the same words also appear in the build prompt.
-        await p.locator("li.bg-amber-50", { hasText: "Looks blurry" }).waitFor({ timeout: 15000 });
-        await p.locator("li.bg-amber-50", { hasText: /^Large image/ }).waitFor({ timeout: 15000 });
+        // Image checks run on the main thread; under a long audit run they can take a while.
+        await p.locator("li.bg-amber-50", { hasText: "Looks blurry" }).waitFor({ timeout: 45000 });
+        await p.locator("li.bg-amber-50", { hasText: /^Large image/ }).waitFor({ timeout: 45000 });
       },
     },
     {
       label: "location removed",
       run: async (p) => {
         await p.getByRole("button", { name: /^Remove location/ }).click();
-        await p.locator("li.bg-amber-50", { hasText: "Contains GPS location" }).waitFor({ state: "detached", timeout: 15000 });
+        await p.locator("li.bg-amber-50", { hasText: "Contains GPS location" }).waitFor({ state: "detached", timeout: 45000 });
       },
     },
   ],
@@ -164,6 +165,28 @@ const STATES = {
         await w.getByRole("button", { name: "Yes, fix it" }).click();
         await w.getByRole("button", { name: /Subscribe/ }).click();
         await w.getByRole("link", { name: /Open Gmail/ }).waitFor();
+      },
+    },
+  ],
+  "/components/toast": [
+    {
+      label: "merged and undo toasts",
+      run: async (p) => {
+        const save = p.getByRole("button", { name: "Save (press it a few times)" });
+        await save.click();
+        await save.click();
+        await p.getByRole("button", { name: /^Archive "/ }).first().click();
+        await p.locator("[data-toast]").first().hover();
+        await p.waitForTimeout(400);
+      },
+    },
+  ],
+  "/components/breadcrumbs": [
+    {
+      label: "sibling menu filtered",
+      run: async (p) => {
+        await p.getByRole("button", { name: "Other items next to Lofi Gallery" }).click();
+        await p.keyboard.type("d");
       },
     },
   ],

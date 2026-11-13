@@ -1,11 +1,26 @@
 import type { Metadata } from "next";
 import { ComponentPage } from "@/components/gallery/ComponentPage";
-import { PlaygroundDemo, PromiseDemo, UndoDemo } from "./demos";
+import { MergeDemo, PlaygroundDemo, PromiseDemo, UndoDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "Toast System",
-  description: "Toaster with stacking, promise toasts, undo actions, swipe to dismiss and six positions.",
+  description:
+    "A toast system where repeats count up (Saved ×3) instead of piling up, related toasts merge into one summary, every toast stays long enough to read, and toast.undo() only commits a change once the toast is gone, with Ctrl/⌘+Z to undo.",
 };
+
+const mergeCode = `
+// Same type + same text: one toast with a count (×2, ×3…) and a fresh timer.
+toast.success("Draft saved");
+
+// Same group: one toast; groupMessage words the summary.
+toast.success(name + " uploaded", {
+  group: "uploads",
+  groupMessage: (count) => count + " photos uploaded",
+});
+
+// group: false always stacks a new toast.
+
+<Toaster duration="auto" />   // the default: about 3s + 0.3s per word, 4–15s`;
 
 const playgroundCode = `
 const [position, setPosition] = useState<ToastPosition>("bottom-right");
@@ -39,15 +54,13 @@ function deploy() {
 
 const undoCode = `
 function archive(email: Email) {
-  setArchived((a) => [...a, email.id]);
-  toast("Email archived", {
-    id: \`archive-\${email.id}\`,   // archiving twice updates the same toast
+  setArchived((a) => [...a, email.id]);          // hide it right away
+  toast.undo("Email archived", {
     description: email.subject,
-    duration: 6000,
-    action: {
-      label: "Undo",
-      onClick: () => setArchived((a) => a.filter((id) => id !== email.id)),
-    },
+    // Undo button or Ctrl/⌘+Z while the toast is up:
+    onUndo: () => setArchived((a) => a.filter((id) => id !== email.id)),
+    // Runs once when the toast closes any other way: now it's safe to save.
+    onCommit: () => api.archive(email.id),
   });
 }`;
 
@@ -86,18 +99,28 @@ export default function Page() {
           minHeight: 220,
         },
         {
-          title: "Email archived, with Undo",
-          description: "An action button restores the email. Archive everything to see the empty state.",
+          title: "Undo that really waits: toast.undo()",
+          description:
+            "Archiving hides the email at once, but the change is only saved (onCommit) when the toast closes. Undo, or Ctrl/⌘+Z anywhere on the page, runs onUndo instead and nothing is saved. The line under the inbox shows what reached the “server”.",
           preview: <UndoDemo />,
           code: undoCode,
-          minHeight: 320,
+          minHeight: 340,
+        },
+        {
+          title: "Repeats count up, groups merge, long text stays longer",
+          description:
+            "Press Save a few times: one “Draft saved ×3” instead of three toasts. Uploads share a group, so they become “3 photos uploaded”. The default duration is “auto”: a toast stays about 3 seconds plus 0.3 seconds per word.",
+          preview: <MergeDemo />,
+          code: mergeCode,
+          minHeight: 260,
         },
       ]}
       usage={usage}
       props={[
         { name: "position", type: '"top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-center" | "bottom-right"', default: '"bottom-right"', description: "Where the stack sits and which way it grows." },
         { name: "max", type: "number", default: "3", description: "Toasts visible at once. Older ones wait and move up as newer ones close." },
-        { name: "duration", type: "number", default: "5000", description: "Default auto-dismiss time in ms. Loading toasts stay until updated or dismissed." },
+        { name: "duration", type: 'number | "auto"', default: '"auto"', description: "Default auto-dismiss time. auto gives each toast time to be read (readingTime: 3s + 0.3s per word, 4–15s); a number is milliseconds. Loading toasts stay until updated or dismissed." },
+        { name: "undoShortcut", type: "boolean", default: "true", description: "Ctrl+Z / ⌘Z undoes the newest toast.undo() on screen. Ignored while typing in a field, where it undoes text." },
         { name: "expand", type: "boolean", default: "false", description: "Always show the stack expanded, not only on hover or focus." },
         { name: "closeButton", type: "boolean", default: "true", description: "Close button on dismissible toasts." },
         { name: "showProgress", type: "boolean", default: "true", description: "Countdown bar along the bottom edge. Hidden with reduced motion; the timer still runs." },
@@ -123,6 +146,7 @@ export default function Page() {
             { name: "toast.loading", type: "(ReactNode, ToastOptions) => string", description: "Spinner toast with no timer. Update it by calling any variant with the same id." },
             { name: "toast.promise", type: "(promise | () => promise, { loading, success, error }, ToastOptions) => Promise<T>", description: "Loading toast that becomes success or error in place. success and error can be functions of the result." },
             { name: "toast.dismiss", type: "(id?: string) => void", description: "Close one toast, or all of them." },
+            { name: "toast.undo", type: "(ReactNode, { onUndo, onCommit?, undoLabel?, undoneMessage?, …ToastOptions }) => string", description: "For changes that are easy to take back. Undo (or Ctrl/⌘+Z) before it closes runs onUndo; closing any other way (timer, ×, swipe, Escape, Clear all) runs onCommit once." },
           ],
         },
         {
@@ -135,6 +159,8 @@ export default function Page() {
             { name: "dismissible", type: "boolean", default: "true", description: "Close button, Escape and swipe." },
             { name: "onDismiss", type: "(id: string) => void", description: "Closed by the user or toast.dismiss()." },
             { name: "onAutoClose", type: "(id: string) => void", description: "Closed because the timer ran out." },
+            { name: "group", type: "string | false", description: "Toasts with the same group merge into one. Without it, the same type and text merge (×2, ×3…). false always stacks." },
+            { name: "groupMessage", type: "(count, latest) => ReactNode", description: "Message of a merged toast, e.g. (n) => n + \" photos uploaded\"." },
           ],
         },
       ]}
@@ -145,6 +171,8 @@ export default function Page() {
         "Hover or focus inside the stack expands it and pauses every timer, so nothing disappears while you read or reach for Undo. Timers also pause while the tab is hidden.",
         "Swipe is a pointer shortcut only; every toast can also be closed with its button or Escape.",
         "With prefers-reduced-motion the toasts fade instead of sliding and the countdown bar is hidden.",
+        "A merged toast is announced again with its new text, and its count is read as “3 times” rather than “×3”.",
+        "The Undo button has aria-keyshortcuts and shows its shortcut; Ctrl/⌘+Z never takes over while you are typing in a field. Auto durations follow reading time, so longer messages stay longer (WCAG 2.2.1), and hover or focus still pauses them.",
       ]}
     />
   );

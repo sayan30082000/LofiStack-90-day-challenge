@@ -1,11 +1,23 @@
 import type { Metadata } from "next";
 import { ComponentPage } from "@/components/gallery/ComponentPage";
-import { DeepPathDemo, SeparatorDemo, ShortPathDemo } from "./demos";
+import { SwitcherDemo, DeepPathDemo, SeparatorDemo, ShortPathDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "Breadcrumbs",
-  description: "Breadcrumb trail that collapses long paths into a menu, truncates long labels with a tooltip and offers a compact back link on mobile.",
+  description:
+    "Breadcrumbs with a sibling switcher: a ▾ on each level lists the other workspaces, projects or pages beside it (with a filter for long lists), so you can move sideways without going up. Plus a collapsing trail, truncation tooltips and a mobile back link.",
 };
+
+const switcherCode = `
+// siblings: the other items at the same level. Include the item itself to mark it as current.
+const items: BreadcrumbItem[] = [
+  { label: "Acme Studio", href: "/w/acme-studio", siblings: workspaces },
+  { label: "Lofi Gallery", href: "/w/acme-studio/lofi-gallery", siblings: projects },   // 12: gets a filter box
+  { label: "Settings", href: "/w/acme-studio/lofi-gallery/settings" },
+  { label: "Billing", siblings: settingsPages },                                        // switch to another settings page
+];
+
+<Breadcrumbs items={items} separator="slash" renderLink={(p) => <Link {...p} />} />`;
 
 const deepCode = `
 const path: BreadcrumbItem[] = [
@@ -82,6 +94,14 @@ export default function Page() {
       slug="breadcrumbs"
       examples={[
         {
+          title: "Move sideways: the sibling switcher",
+          description:
+            "The ▾ after a crumb lists the items next to it: switch workspace, jump to another of 12 projects (a filter box appears for long lists) or to another settings page, without climbing up first. The current item is ticked.",
+          preview: <SwitcherDemo />,
+          code: switcherCode,
+          minHeight: 340,
+        },
+        {
           title: "Deep file path",
           description:
             "Six levels collapse into a “…” menu that lists the hidden folders as a small tree. The long file name truncates with a tooltip, and narrow widths swap to a back link.",
@@ -123,6 +143,9 @@ export default function Page() {
         { name: "loading", type: "boolean", default: "false", description: "Shows skeleton crumbs and sets aria-busy." },
         { name: "loadingLabel", type: "string", default: '"Loading breadcrumb"', description: "Announced while loading." },
         { name: "loadingCount", type: "number", default: "3", description: "Number of skeleton crumbs." },
+        { name: "siblingsLabel", type: "(item) => string", default: '"Other items next to {label}"', description: "Accessible name of a sibling ▾ button and its list." },
+        { name: "siblingFilterThreshold", type: "number", default: "7", description: "Sibling menus with more items than this get a filter box (filterSiblings: case- and accent-insensitive)." },
+        { name: "siblingFilterLabel / noMatchesLabel", type: "string", default: '"Filter…" / "No matches"', description: "Filter box name and the text when nothing matches." },
         { name: "className", type: "string", description: "Classes for the nav element." },
       ]}
       types={[
@@ -133,6 +156,7 @@ export default function Page() {
             { name: "href", type: "string", description: "Link target. Items without one render as plain text." },
             { name: "icon", type: "ReactNode", description: "Icon before the label, sized to 16px." },
             { name: "disabled", type: "boolean", default: "false", description: "Muted, non-interactive text." },
+            { name: "siblings", type: "BreadcrumbItem[]", description: "Other items at the same level. Adds a ▾ menu of links; include this item to show it ticked as current." },
           ],
         },
         {
@@ -151,6 +175,7 @@ export default function Page() {
         "The “…” button is named “Show 3 more” and exposes aria-expanded and aria-controls. Arrow Down or Up opens it and moves into the list; arrows, Home and End move between links; Escape closes and returns focus; Tab out or a click outside closes it.",
         "Truncation is visual only: the full label stays in the DOM. When a label is cut off, a tooltip shows it on hover and focus, and a truncated current page becomes focusable so keyboard users can reveal it.",
         "Every link, the “…” button and the back link are at least 40px tall with a visible focus ring. Reduced motion removes the menu animation and color transitions.",
+        "Each ▾ is a button named “Other items next to Lofi Gallery” with aria-expanded; Arrow Down opens it into the filter box (or the first link), arrows move through the links, Escape returns to the button. The current item is read as “Billing, current”, and the number of matches is announced while filtering.",
       ]}
     />
   );
