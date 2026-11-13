@@ -63,12 +63,17 @@ jobs:
             sleep 1
           done
           # Every page must hydrate even with the comment Netlify injects into <head>.
-          npm run check:hydration
-          npm run a11y
+          set -o pipefail
+          npm run check:hydration 2>&1 | tee checks.log
+          npm run a11y 2>&1 | tee -a checks.log
 
       - name: Audit report in the run summary
         if: always()
         run: |
+          # On failure, put the reason first: failing pages, timeouts and errors from the checks.
+          if [ -f checks.log ] && grep -qE "✗|failed|Error" checks.log; then
+            { echo "## Why the checks failed"; echo '```'; grep -E "✗|failed|Error|waiting for|Timeout" checks.log | head -40; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ -f docs/a11y-report.md ]; then cat docs/a11y-report.md >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Keep the audit report
