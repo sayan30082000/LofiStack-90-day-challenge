@@ -137,6 +137,36 @@ const STATES = {
   "/components/donut-chart": [
     { label: "Other opened", run: (p) => p.getByRole("button", { name: /^Other/ }).first().click() },
   ],
+  "/components/data-table": [
+    {
+      label: "filters, a typo and a selection",
+      run: async (p) => {
+        const w = p.locator('[id$="-panel-preview"]').first();
+        await w.getByRole("button", { name: "joined<2024 -status:suspended", exact: true }).click();
+        await w.locator("input[type=search]").fill("joined<2024 -status:suspended rol:viewer");
+        await w.getByRole("checkbox", { name: /^Select (?!all)/ }).first().check();
+      },
+    },
+  ],
+  "/components/newsletter-signup": [
+    {
+      label: "typo suggestion",
+      run: async (p) => {
+        const w = p.locator('[id$="-panel-preview"]').first();
+        await w.getByRole("textbox", { name: "Email address" }).fill("jane@gmial.com");
+        await w.getByRole("button", { name: /Subscribe/ }).click();
+      },
+    },
+    {
+      label: "success with inbox link",
+      run: async (p) => {
+        const w = p.locator('[id$="-panel-preview"]').first();
+        await w.getByRole("button", { name: "Yes, fix it" }).click();
+        await w.getByRole("button", { name: /Subscribe/ }).click();
+        await w.getByRole("link", { name: /Open Gmail/ }).waitFor();
+      },
+    },
+  ],
   "/components/tree-view": [
     { label: "changes only", run: (p) => p.getByRole("button", { name: /^Changes/ }).first().click() },
   ],
@@ -163,6 +193,8 @@ try {
         await state.run(page);
         await page.waitForTimeout(400);
       }
+      // The site header is sticky: scrolled content under it would count as "obscured" targets.
+      await page.evaluate(() => window.scrollTo(0, 0));
       // A state may reload the page, which drops axe: inject it again.
       if (!(await page.evaluate(() => typeof window.axe !== "undefined"))) await page.addScriptTag({ content: axeSource });
       const violations = await page.evaluate(async () => {

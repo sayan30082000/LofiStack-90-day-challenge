@@ -106,6 +106,15 @@ export const agentLogs: AgentLog[] = [
       "Run #1 failed at the type-check after 1 minute: in a fresh checkout the route types (LayoutProps) that next build generates don't exist yet, which never shows up locally. It reproduced the failure in a clean clone, fixed it with next typegen before tsc, and checked lint, the 248 tests and the docs check in that clone before pushing. Run #2 passed every step in 4 min 23 s, including the accessibility audit (136 page/state runs, no violations). Every push is now checked without me running anything. Saves about 20 minutes per release.",
     automated: true,
   },
+  {
+    week: 9,
+    task: "Research and compare 4 React UI libraries (shadcn/ui, Mantine, Chakra UI, Headless UI), then find component ideas none of them offers",
+    agent: "Claude Code (a research sub-agent with web search)",
+    workflow: "Using web search and the libraries' own docs (official sites, GitHub, npm), compare shadcn/ui, Mantine, Chakra UI and Headless UI on styling, accessibility, theming and install/bundle impact, with 3 components each does especially well. Then propose 5 component ideas none of them offers (check each against all four component lists and against my 72 planned components), each with a challenge Type. Cite every page you read, never guess versions or sizes, and mark anything you couldn't verify.",
+    result:
+      "A sub-agent read 49 sources (official docs, GitHub, npm, bundlephobia) and wrote research/week-09-library-research.md: a comparison table, a section per library, 5 new ideas (Query Builder, Signature Pad, Keyboard Shortcuts Sheet, Image Hotspot Showcase, Scrollytelling Feature Section) and a not-verified list. Useful finds: shadcn/ui switched its default foundation to Base UI in July 2026 and added React Aria; whole-package sizes (gzip, before tree-shaking) are about 63 KB for Headless UI, 191 KB for Mantine core and 331 KB for Chakra. The two section ideas give me a replacement for my Week 14 Before/After Slider, which a teammate already built. Saved about 3 hours of reading.",
+    automated: true,
+  },
 ];
 
 /** One different kind of task per week. Week 1 is already logged above. */
@@ -172,9 +181,9 @@ Add an "npm test" script, run the tests, fix any real bug you find in the compon
   {
     week: 9,
     kind: "Research summary",
-    task: "Compare 4 popular React component libraries for ideas and gaps",
-    agent: "Claude (with web search)",
-    prompt: `Research shadcn/ui, Mantine, Chakra UI and Headless UI. For each: styling approach, accessibility approach, theming, bundle impact, and 3 components it does especially well. Then list 5 component ideas none of them offer well that I could build next. Cite the pages you used.`,
+    task: "Research and compare 4 React UI libraries (shadcn/ui, Mantine, Chakra UI, Headless UI), then find component ideas none of them offers",
+    agent: "Claude Code (with web search)",
+    prompt: `Using web search and the libraries' own docs (official sites, GitHub, npm), compare shadcn/ui, Mantine, Chakra UI and Headless UI on styling, accessibility, theming and install/bundle impact, with 3 components each does especially well. Then propose 5 component ideas none of them offers (check each against all four component lists and against my 72 planned components), each with a challenge Type. Cite every page you read, never guess versions or sizes, and mark anything you couldn't verify.`,
   },
   {
     week: 10,

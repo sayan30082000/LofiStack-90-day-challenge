@@ -860,7 +860,7 @@ export function MultiStepForm<V extends Record<string, unknown>>({
             aria-disabled={submitting || validating || undefined}
             className={cn(
               "group inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm outline-none transition-[background-color,transform] motion-reduce:transition-none",
-              "hover:bg-indigo-700 active:scale-[0.98] active:bg-indigo-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:active:bg-indigo-600 dark:focus-visible:ring-offset-zinc-900",
+              "hover:bg-indigo-700 active:scale-[0.98] active:bg-indigo-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:active:bg-indigo-600 dark:focus-visible:ring-offset-zinc-900",
               (submitting || validating) && "cursor-progress",
             )}
           >

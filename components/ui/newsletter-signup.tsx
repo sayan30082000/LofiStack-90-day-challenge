@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowRight, CircleAlert, LoaderCircle, Mail } from "lucide-react";
+import { ArrowRight, CircleAlert, ExternalLink, LoaderCircle, Mail, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type NewsletterSignupStatus = "idle" | "submitting" | "success" | "error";
@@ -51,6 +51,23 @@ export interface NewsletterSignupProps {
   /** card: framed panel with icon and heading. inline: a bare row that fits a footer or sidebar. */
   variant?: NewsletterSignupVariant;
   disabled?: boolean;
+  /**
+   * Catch typos in the email domain ("gmial.com", "hotmail.con") and offer the fix. Pass your own
+   * list of domains, or false to turn it off.
+   */
+  suggestDomains?: string[] | false;
+  /** Sender of the confirmation email, used to search for it in Gmail. */
+  senderEmail?: string;
+  /** On success, link to the subscriber's webmail (Gmail, Outlook, Yahoo, iCloud, Proton…) when it's known. */
+  showInboxLink?: boolean;
+  /** "Did you mean …?" text. */
+  suggestionText?: (suggestion: string) => ReactNode;
+  /** Button that accepts the suggestion. */
+  acceptSuggestionText?: string;
+  /** Button that keeps what was typed. */
+  keepTypedText?: string;
+  /** Text of the webmail link, e.g. "Open Gmail". */
+  openInboxText?: (provider: string) => string;
   className?: string;
 }
 
@@ -87,6 +104,76 @@ const STYLE = `
 }
 `;
 
+/* ---------- Typo suggestions and inbox links (pure) ---------- */
+
+/** Email providers most sign-ups use; typos of these get a suggestion. */
+export const COMMON_EMAIL_DOMAINS = [
+  "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com", "zoho.com", "yandex.com", "gmx.com",
+  "mail.com", "yahoo.co.uk", "hotmail.co.uk",
+];
+/** Known slips on common endings. Only these are fixed: .ca, .bb or .cm are real country domains. */
+const TLD_TYPOS: Record<string, string> = {
+  con: "com", cmo: "com", ocm: "com", cpm: "com", cim: "com", vom: "com", xom: "com", comm: "com", coom: "com",
+  ner: "net", nte: "net", bet: "net", met: "net", nett: "net",
+  ogr: "org", rog: "org", prg: "org", orgg: "org",
+};
+
+function editDistance(a: string, b: string) {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return row[b.length];
+}
+
+/**
+ * Suggests a fix for a mistyped email domain: "jane@gmial.com" → "jane@gmail.com",
+ * "jane@hotmail.con" → "jane@hotmail.com", "jane@gmailcom" → "jane@gmail.com". Returns null
+ * when the domain looks right (or nothing is close enough to be sure).
+ */
+export function suggestEmail(email: string, domains: string[] = COMMON_EMAIL_DOMAINS): string | null {
+  const at = email.lastIndexOf("@");
+  if (at < 1) return null;
+  const local = email.slice(0, at).trim();
+  const domain = email.slice(at + 1).trim().toLowerCase();
+  if (!domain || domains.includes(domain)) return null;
+  // A known provider, one or two keystrokes away (shorter domains get less slack).
+  let best: { d: string; dist: number } | null = null;
+  for (const d of domains) {
+    const dist = editDistance(domain, d);
+    if (dist > 0 && dist <= (d.length > 6 ? 2 : 1) && (!best || dist < best.dist)) best = { d, dist };
+  }
+  if (best) return `${local}@${best.d}`;
+  // Any domain with a known slip in its ending: example.con → example.com.
+  const dot = domain.lastIndexOf(".");
+  const fix = dot > 0 ? TLD_TYPOS[domain.slice(dot + 1)] : undefined;
+  return fix ? `${local}@${domain.slice(0, dot)}.${fix}` : null;
+}
+
+/** Webmail for the address's provider, so the success screen can open the confirmation email. */
+export function inboxFor(email: string, sender?: string): { name: string; url: string } | null {
+  const domain = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
+  if (/^(gmail|googlemail)\.com$/.test(domain)) {
+    const search = sender ? `#search/${encodeURIComponent(`from:${sender} in:anywhere`)}` : "#inbox";
+    return { name: "Gmail", url: `https://mail.google.com/mail/u/0/${search}` };
+  }
+  if (/^(outlook|hotmail|live|msn)\.[a-z.]+$/.test(domain)) return { name: "Outlook", url: "https://outlook.live.com/mail/0/" };
+  if (/^(yahoo\.[a-z.]+|ymail\.com)$/.test(domain)) return { name: "Yahoo Mail", url: "https://mail.yahoo.com/" };
+  if (/^(icloud|me|mac)\.com$/.test(domain)) return { name: "iCloud Mail", url: "https://www.icloud.com/mail" };
+  if (/^(proton\.me|protonmail\.com|pm\.me)$/.test(domain)) return { name: "Proton Mail", url: "https://mail.proton.me/" };
+  if (domain === "aol.com") return { name: "AOL Mail", url: "https://mail.aol.com/" };
+  if (/^zoho\.[a-z.]+$/.test(domain)) return { name: "Zoho Mail", url: "https://mail.zoho.com/" };
+  if (/^yandex\.[a-z.]+$/.test(domain)) return { name: "Yandex Mail", url: "https://mail.yandex.com/" };
+  return null;
+}
+
 function errorMessageOf(err: unknown, fallback: string) {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === "string" && err) return err;
@@ -122,6 +209,17 @@ export function NewsletterSignup({
   icon,
   variant = "card",
   disabled = false,
+  suggestDomains = COMMON_EMAIL_DOMAINS,
+  senderEmail,
+  showInboxLink = true,
+  suggestionText = (sug) => (
+    <>
+      Did you mean <strong className="font-semibold">{sug}</strong>?
+    </>
+  ),
+  acceptSuggestionText = "Yes, fix it",
+  keepTypedText = "No, keep mine",
+  openInboxText = (provider) => `Open ${provider}`,
   className,
 }: NewsletterSignupProps) {
   const uid = useId();
@@ -142,6 +240,11 @@ export function NewsletterSignup({
   const [serverError, setServerError] = useState<string | null>(null);
   const [subscribedEmail, setSubscribedEmail] = useState("");
   const [shake, setShake] = useState(false);
+  // The address the person chose to keep despite a suggestion, so it isn't offered again.
+  const [keptEmail, setKeptEmail] = useState<string | null>(null);
+  const [checkedTypo, setCheckedTypo] = useState(false);
+  const suggestionId = `${uid}-suggestion`;
+  const acceptRef = useRef<HTMLButtonElement>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
@@ -163,6 +266,12 @@ export function NewsletterSignup({
     }
   }, [status]);
 
+  const trimmed = email.trim();
+  const suggestion = suggestDomains && trimmed && isValid(trimmed) && trimmed !== keptEmail ? suggestEmail(trimmed, suggestDomains) : null;
+  // Shown once the person leaves the field or tries to submit, not while they're still typing.
+  const showSuggestion = Boolean(suggestion && checkedTypo && status !== "success");
+  const inbox = showInboxLink && subscribedEmail ? inboxFor(subscribedEmail, senderEmail) : null;
+
   const submitting = status === "submitting";
   const locked = disabled || submitting;
 
@@ -178,6 +287,12 @@ export function NewsletterSignup({
       setShake(true);
       if (err) inputRef.current?.focus();
       else document.getElementById(consentId)?.focus();
+      return;
+    }
+    if (suggestion) {
+      // Ask before sending to an address that is probably mistyped.
+      setCheckedTypo(true);
+      setTimeout(() => acceptRef.current?.focus(), 0);
       return;
     }
     const value = email.trim();
@@ -196,6 +311,8 @@ export function NewsletterSignup({
 
   const reset = () => {
     focusAfterReset.current = true;
+    setKeptEmail(null);
+    setCheckedTypo(false);
     setEmail("");
     setConsent(false);
     setSubmitted(false);
@@ -206,7 +323,9 @@ export function NewsletterSignup({
   };
 
   const isCard = variant === "card";
-  const describedBy = [fieldError && errorId, serverError && serverErrorId, footnote && footnoteId].filter(Boolean).join(" ");
+  const describedBy = [fieldError && errorId, showSuggestion && suggestionId, serverError && serverErrorId, footnote && footnoteId]
+    .filter(Boolean)
+    .join(" ");
   const hasError = Boolean(fieldError) || status === "error";
   const message = typeof successMessage === "function" ? successMessage(subscribedEmail) : successMessage;
 
@@ -251,10 +370,22 @@ export function NewsletterSignup({
             <div className="lofi-newsletter-signup-rise min-w-0">
               <p className={cn("font-semibold text-zinc-900 dark:text-zinc-50", isCard ? "text-lg" : "text-base")}>{successTitle}</p>
               <p className="mt-1 text-zinc-600 dark:text-zinc-400">{message}</p>
+              {inbox && (
+                <a
+                  href={inbox.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 flex h-10 w-fit items-center gap-2 rounded-lg bg-indigo-600 px-3.5 text-sm font-semibold text-white shadow-sm outline-none hover:bg-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:focus-visible:ring-offset-zinc-900"
+                >
+                  {openInboxText(inbox.name)}
+                  <ExternalLink aria-hidden className="size-4" />
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              )}
               <button
                 type="button"
                 onClick={reset}
-                className="-ml-2 mt-1.5 inline-flex min-h-10 items-center rounded-md px-2 font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-4 outline-none hover:text-indigo-900 hover:decoration-indigo-600 focus-visible:ring-2 focus-visible:ring-indigo-500 active:text-indigo-950 dark:text-indigo-300 dark:decoration-indigo-500/50 dark:hover:text-indigo-200 dark:hover:decoration-indigo-300"
+                className="-ml-2 mt-1.5 flex min-h-10 w-fit items-center rounded-md px-2 font-medium text-indigo-700 underline decoration-indigo-300 underline-offset-4 outline-none hover:text-indigo-900 hover:decoration-indigo-600 focus-visible:ring-2 focus-visible:ring-indigo-500 active:text-indigo-950 dark:text-indigo-300 dark:decoration-indigo-500/50 dark:hover:text-indigo-200 dark:hover:decoration-indigo-300"
               >
                 {resetText}
               </button>
@@ -328,6 +459,7 @@ export function NewsletterSignup({
                   aria-describedby={describedBy || undefined}
                   onChange={(e) => {
                     setEmail(e.target.value);
+                    setCheckedTypo(false);
                     // Once a field is flagged, clear the error as soon as the value becomes valid.
                     if (fieldError && !check(e.target.value)) setFieldError(null);
                     if (status === "error") {
@@ -337,6 +469,7 @@ export function NewsletterSignup({
                   }}
                   onBlur={() => {
                     if (submitted) setFieldError(check(email));
+                    setCheckedTypo(true);
                   }}
                   className={cn(
                     "h-11 w-full rounded-lg border bg-white pl-9 pr-3 text-[15px] text-zinc-900 shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-zinc-500 motion-reduce:transition-none sm:text-sm dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-400",
@@ -360,7 +493,7 @@ export function NewsletterSignup({
                   "disabled:cursor-not-allowed",
                   status === "error"
                     ? "bg-rose-600 hover:bg-rose-700 active:bg-rose-800 dark:bg-rose-600 dark:hover:bg-rose-500"
-                    : "bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] active:bg-indigo-800 dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:active:bg-indigo-600",
+                    : "bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] active:bg-indigo-800 dark:bg-indigo-500 dark:hover:bg-indigo-600 dark:active:bg-indigo-600",
                   disabled && "bg-zinc-300 text-zinc-600 shadow-none hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700",
                   submitting && "cursor-progress",
                 )}
@@ -388,6 +521,43 @@ export function NewsletterSignup({
                 {fieldError}
               </p>
             )}
+
+            {/* Always present, so the suggestion is announced when it appears. */}
+            <div role="status">
+              {showSuggestion && suggestion && (
+                <div
+                  id={suggestionId}
+                  className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:bg-amber-400/10 dark:text-amber-100"
+                >
+                  <Sparkles aria-hidden className="size-4 shrink-0" />
+                  <span className="min-w-0">{suggestionText(suggestion)}</span>
+                  <span className="flex gap-1">
+                    <button
+                      ref={acceptRef}
+                      type="button"
+                      onClick={() => {
+                        setEmail(suggestion);
+                        setFieldError(null);
+                        inputRef.current?.focus();
+                      }}
+                      className="inline-flex min-h-8 items-center rounded-md bg-amber-900 px-2.5 font-semibold text-white outline-none hover:bg-amber-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 dark:bg-amber-300 dark:text-amber-950 dark:hover:bg-amber-200"
+                    >
+                      {acceptSuggestionText}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKeptEmail(trimmed);
+                        inputRef.current?.focus();
+                      }}
+                      className="inline-flex min-h-8 items-center rounded-md px-2 font-medium text-amber-900 underline underline-offset-2 outline-none hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-amber-100 dark:hover:bg-amber-400/15"
+                    >
+                      {keepTypedText}
+                    </button>
+                  </span>
+                </div>
+              )}
+            </div>
 
             {serverError && (
               <div

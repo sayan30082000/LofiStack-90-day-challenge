@@ -71,7 +71,8 @@ export function BlogFooterDemo() {
           title="One thoughtful essay, every other Sunday"
           description="Join 4,200 engineers and designers. No listicles, no tracking pixels."
           buttonText="Subscribe"
-          footnote="Unsubscribe with one click. Try an email with “fail” in it to see the error state."
+          footnote="Unsubscribe with one click. Try jane@gmial.com or jane@hotmail.con to see a typo caught, a gmail.com address to get an Open Gmail button, or “fail” in the email for the error state."
+          senderEmail="hello@quietmargins.example"
           onSubscribe={fakeSubscribe}
         />
       </footer>

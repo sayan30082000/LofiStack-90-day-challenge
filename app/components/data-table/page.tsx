@@ -5,10 +5,12 @@ import { InvoicesDemo, UsersDemo } from "./demos";
 export const metadata: Metadata = {
   title: "Data Table",
   description:
-    "Typed data table with three-state sorting, global search, a status filter, row selection with a bulk action bar, pagination, column visibility, a sticky header and a pinned first column.",
+    "A data table whose search box takes filters like role:admin spend>5000 -status:suspended, shows each as a removable chip, catches misspelled column names, and totals the matching (or selected) rows in a summary row.",
 };
 
 const usersCode = `
+// The search box also takes filters: role:admin  spend>5000  joined<2024  -status:suspended  "jane cooper"
+// queryKey renames a column in filters; summary adds a footer cell (sum, avg, min, max, count or a function).
 const columns: ColumnDef<User>[] = [
   { id: "name", header: "Name", accessor: "name", sortable: true, hideable: false, minWidth: 200, cell: (u) => <UserCell user={u} /> },
   { id: "email", header: "Email", accessor: "email", sortable: true },
@@ -83,9 +85,9 @@ export default function Page() {
       slug="data-table"
       examples={[
         {
-          title: "Workspace members",
+          title: "Search that filters, and a summary row",
           description:
-            "50 seeded fake users. Search, filter by status, click headers to sort ascending → descending → off, select rows (or every match) for bulk actions, hide columns, and scroll sideways at narrow widths: the header and the Name column stay put. Toggle loading and empty states above the table.",
+            "50 seeded fake users. Type plain words, or column filters: role:admin, spend>5000, joined<2024, -status:suspended (the Try buttons fill some in). Each filter becomes a chip you can remove; a misspelled column (rol:viewer) gets a “Did you mean role?” fix. The footer totals Spend for the matching rows, or for the selected rows while there is a selection. Sorting, bulk actions, column menu, sticky header and pinned Name column still work as before.",
           preview: <UsersDemo />,
           code: usersCode,
           minHeight: 640,
@@ -106,7 +108,8 @@ export default function Page() {
         { name: "getRowId", type: "(row: T) => string", description: "Stable id per row for keys and selection." },
         { name: "caption", type: "string", description: "Accessible name of the table and its scroll region. Required." },
         { name: "showCaption", type: "boolean", default: "false", description: "Show the caption visually (it is always read by screen readers)." },
-        { name: "searchable", type: "boolean", default: "true", description: "Global search across columns whose searchable is not false." },
+        { name: "searchable", type: "boolean", default: "true", description: "Search box. Plain words match any searchable column; column:value, column>n, column<n, >=, <= filter one column (numbers like 1.5k or $1,250, and dates like 2024 or 2024-06); a leading - negates; quotes keep phrases together." },
+        { name: "query / defaultQuery / onQueryChange", type: "string / string / (q) => void", description: "Control the search text, e.g. from buttons, the URL or saved views." },
         { name: "filter", type: "DataTableFilter<T>", description: "One select filter in the toolbar, e.g. status." },
         { name: "pageSize", type: "number", default: "10", description: "Initial rows per page." },
         { name: "pageSizeOptions", type: "number[]", default: "[10, 25, 50]", description: "Rows-per-page choices. [] hides the select." },
@@ -138,6 +141,10 @@ export default function Page() {
             { name: "defaultHidden", type: "boolean", default: "false", description: "Start hidden." },
             { name: "minWidth", type: "number", description: "Minimum width in px." },
             { name: "className", type: "string", description: "Classes for body cells." },
+            { name: "queryKey", type: "string", description: "Name used in filters (role:admin). Defaults to the id; the header without spaces also works." },
+            { name: "queryValue", type: "(row) => unknown", description: "Value filters compare with, when it differs from the accessor." },
+            { name: "summary", type: '"sum" | "avg" | "min" | "max" | "count" | (rows) => ReactNode', description: "Footer cell for the matching rows, or the selected rows while there is a selection." },
+            { name: "summaryFormat", type: "(n: number) => string", description: "Formats a numeric summary, e.g. as currency." },
           ],
         },
         {
@@ -167,6 +174,8 @@ export default function Page() {
         "The bulk action bar sits in a polite live region, so “3 selected” is announced; result counts after searching and loading are announced through a status region.",
         "Search, filter and page size have labels; pagination is a labelled nav with named icon buttons that disable at the ends. Every control is at least 40px tall.",
         "Skeleton rows are hidden from assistive tech while the table reports aria-busy; pulse animations stop under prefers-reduced-motion.",
+        "Each filter chip is a button named “Remove filter Role: admin”; removing one returns focus to the search box. The result count is announced as filters change.",
+        "The summary row is a real <tfoot> whose first cell says what it covers (“Total (11 rows)” or “Selected (3)”), so screen readers hear it with the table.",
       ]}
     />
   );

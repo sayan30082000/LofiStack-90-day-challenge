@@ -140,6 +140,7 @@ const COLUMNS: ColumnDef<User>[] = [
     header: "Status",
     accessor: "status",
     sortable: true,
+    summary: (rows) => `${rows.filter((r) => r.status === "Active").length} active`,
     cell: (u) => (
       <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset", STATUS_STYLE[u.status])}>
         <span aria-hidden className={cn("size-1.5 rounded-full", STATUS_DOT[u.status])} />
@@ -154,6 +155,8 @@ const COLUMNS: ColumnDef<User>[] = [
     sortable: true,
     searchable: false,
     cell: (u) => <time dateTime={u.joined}>{formatDate(u.joined)}</time>,
+    // joined<2024 and joined>=2025-06 compare dates.
+    summary: (rows) => (rows.length ? `newest ${formatDate(rows.map((r) => r.joined).sort().at(-1)!)}` : "–"),
   },
   {
     id: "spend",
@@ -163,6 +166,8 @@ const COLUMNS: ColumnDef<User>[] = [
     align: "right",
     searchable: false,
     cell: (u) => (u.spend === 0 ? <span className="text-zinc-500 dark:text-zinc-400">—</span> : usd.format(u.spend)),
+    summary: "sum",
+    summaryFormat: (n) => usd.format(n),
   },
 ];
 
@@ -178,8 +183,12 @@ const STATUS_FILTER: DataTableFilter<User> = {
 
 /* ---------- Demo ---------- */
 
+/** Example searches; the last one has a typo on purpose. */
+const EXAMPLES = ["role:admin", "spend>5000", "joined<2024 -status:suspended", "role:editor spend>=1k", "rol:viewer"];
+
 export function UsersDemo() {
   const [users, setUsers] = useState<User[]>(USERS);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [empty, setEmpty] = useState(false);
   const [log, setLog] = useState("Select rows to see the bulk action bar.");
@@ -241,8 +250,24 @@ export function UsersDemo() {
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="mr-1 text-zinc-600 dark:text-zinc-400">Try:</span>
+        {EXAMPLES.map((q) => (
+          <button
+            key={q}
+            type="button"
+            onClick={() => setQuery(q)}
+            className="inline-flex min-h-8 items-center rounded-md border border-zinc-300 bg-white px-2 font-mono text-xs text-zinc-800 outline-none hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+
       <DataTable
         caption="Workspace members"
+        query={query}
+        onQueryChange={setQuery}
         data={empty ? [] : users}
         columns={COLUMNS}
         getRowId={(u) => u.id}
@@ -254,7 +279,7 @@ export function UsersDemo() {
         onSelectionChange={(ids) => ids.length > 0 && setLog(`onSelectionChange: ${ids.length} selected`)}
         pageSize={10}
         loading={loading}
-        labels={{ searchPlaceholder: "Search name, email or role…" }}
+        labels={{ searchPlaceholder: "Search, or filter: role:admin spend>5000" }}
         maxHeight={480}
       />
     </div>

@@ -182,7 +182,7 @@ function Actions({ onNavigate }: { onNavigate: (href: string, e: MouseEvent<HTML
       <a
         href="/signup"
         onClick={(e) => onNavigate("/signup", e)}
-        className={`${actionBase} bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400`}
+        className={`${actionBase} bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600`}
       >
         Start free
       </a>

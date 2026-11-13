@@ -10,6 +10,7 @@ import {
   ChevronsRight,
   ChevronsUpDown,
   Columns3,
+  Filter,
   Inbox,
   Search,
   SearchX,
@@ -43,6 +44,17 @@ export interface ColumnDef<T> {
   minWidth?: number;
   /** Extra classes for this column's body cells. */
   className?: string;
+  /** Name used in search filters (plan:pro). Defaults to the id. */
+  queryKey?: string;
+  /** Value that filters compare with, when it differs from the accessor (e.g. a Date for a formatted date). */
+  queryValue?: (row: T) => unknown;
+  /**
+   * Summary in the footer row for the rows shown (or the selected rows, while there is a selection):
+   * "sum", "avg", "min", "max", "count", or a function of the rows.
+   */
+  summary?: SummaryKind | ((rows: T[]) => ReactNode);
+  /** Formats a numeric summary. Defaults to a plain number with up to 2 decimals. */
+  summaryFormat?: (value: number) => string;
 }
 
 export interface DataTableFilterOption {
@@ -93,6 +105,14 @@ export interface DataTableLabels {
   loading: string;
   emptyTitle: string;
   emptyDescription: string;
+  /** Chip text for a column filter, e.g. "Plan: pro" or "MRR > 500". */
+  filterChip: (header: string, op: QueryOperator, value: string, negate: boolean) => string;
+  removeFilter: (chip: string) => string;
+  /** Notice for a filter naming no column. */
+  unknownField: (field: string, suggestion: string | null) => string;
+  applySuggestion: (suggestion: string) => string;
+  /** Label of the summary row. */
+  summaryLabel: (rows: number, selected: boolean) => string;
 }
 
 export interface DataTableProps<T> {
@@ -104,8 +124,14 @@ export interface DataTableProps<T> {
   caption: string;
   /** Show the caption visually. It is always available to screen readers. */
   showCaption?: boolean;
-  /** Shows the global search box. */
+  /** Shows the search box, which also takes column filters like plan:pro or spend>500. */
   searchable?: boolean;
+  /** Search text (controlled). */
+  query?: string;
+  /** Initial search text (uncontrolled). */
+  defaultQuery?: string;
+  /** Called whenever the search text changes, from typing, chips or suggestions. */
+  onQueryChange?: (query: string) => void;
   /** One select filter in the toolbar, e.g. status. */
   filter?: DataTableFilter<T>;
   pageSize?: number;
@@ -135,7 +161,7 @@ export interface DataTableProps<T> {
 
 const DEFAULT_LABELS: DataTableLabels = {
   search: "Search",
-  searchPlaceholder: "Search…",
+  searchPlaceholder: "Search or filter, e.g. plan:pro",
   clearSearch: "Clear search",
   columns: "Columns",
   selectAllOnPage: "Select all rows on this page",
@@ -157,7 +183,14 @@ const DEFAULT_LABELS: DataTableLabels = {
   loading: "Loading rows…",
   emptyTitle: "No data yet",
   emptyDescription: "Rows will appear here once there is something to show.",
+  filterChip: (h, op, v, neg) => `${neg ? "not " : ""}${h}${op === ":" ? ":" : ` ${op}`} ${v}`,
+  removeFilter: (chip) => `Remove filter ${chip}`,
+  unknownField: (f, s) => `No column called “${f}”.${s ? ` Did you mean “${s}”?` : ""}`,
+  applySuggestion: (s) => `Use ${s}`,
+  summaryLabel: (n, sel) => (sel ? `Selected (${n})` : `Total (${n} ${n === 1 ? "row" : "rows"})`),
 };
+
+const NUMBER_FORMAT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 const CHECK_COL = 52;
 const SKELETON_WIDTHS = ["w-32", "w-44", "w-16", "w-20", "w-24", "w-14", "w-28"];
@@ -178,6 +211,131 @@ function compare(a: unknown, b: unknown) {
   if (typeof a === "number" && typeof b === "number") return a - b;
   if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
   return collator.compare(toText(a), toText(b));
+}
+
+/* ---------- Query language (pure) ---------- */
+
+export type QueryOperator = ":" | ">" | "<" | ">=" | "<=";
+
+/** One piece of a search: a plain word or phrase, or a column filter like plan:pro or mrr>500. */
+export type QueryTerm =
+  | { kind: "text"; value: string; negate: boolean; raw: string }
+  | { kind: "field"; field: string; op: QueryOperator; value: string; negate: boolean; raw: string };
+
+const TOKEN = /(-?)(?:([A-Za-z_][\w-]*)(>=|<=|:|>|<))?("([^"]*)"?|[^\s"]+)/g;
+
+/**
+ * Parses a search like `plan:pro mrr>500 -status:churned "jane cooper"`. Words and quoted phrases
+ * are text terms; `column:value` matches text in that column, `column>n` / `<` / `>=` / `<=`
+ * compare numbers or dates, and a leading `-` negates any term.
+ */
+export function parseTableQuery(query: string): QueryTerm[] {
+  const terms: QueryTerm[] = [];
+  for (const m of query.matchAll(TOKEN)) {
+    const [raw, neg, field, op, token, quoted] = m;
+    const value = quoted ?? token;
+    if (!value) continue;
+    const negate = neg === "-";
+    if (field && op) terms.push({ kind: "field", field: field.toLowerCase(), op: op as QueryOperator, value, negate, raw });
+    else terms.push({ kind: "text", value: value.toLowerCase(), negate, raw });
+  }
+  return terms;
+}
+
+/** Number from "$1,250", "1.5k", "12%"; null when it isn't one. */
+function toNumber(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string") return null;
+  const m = v.trim().replace(/[,\s$€£৳%]/g, "").match(/^(-?\d*\.?\d+)([kmb])?$/i);
+  if (!m) return null;
+  const mult = { k: 1e3, m: 1e6, b: 1e9 }[(m[2] ?? "").toLowerCase() as "k" | "m" | "b"] ?? 1;
+  return Number(m[1]) * mult;
+}
+
+/** Time from a Date, or from "2025", "2025-03" and "2025-03-14" style text; null otherwise. */
+function toTime(v: unknown): number | null {
+  if (v instanceof Date) return v.getTime();
+  if (typeof v !== "string" || !/^\d{4}(-\d{2}(-\d{2})?)?/.test(v.trim())) return null;
+  const t = Date.parse(v.trim().length === 4 ? `${v.trim()}-01-01` : v.trim());
+  return Number.isNaN(t) ? null : t;
+}
+
+function compareTerm(raw: unknown, op: QueryOperator, value: string): boolean {
+  if (op === ":") return toText(raw).toLowerCase().includes(value.toLowerCase());
+  const n = toNumber(value);
+  const rn = toNumber(raw);
+  let a: number | null = null;
+  let b: number | null = null;
+  if (n !== null && rn !== null && !(raw instanceof Date)) [a, b] = [rn, n];
+  else {
+    const tv = toTime(value);
+    const tr = toTime(raw);
+    if (tv !== null && tr !== null) [a, b] = [tr, tv];
+  }
+  if (a === null || b === null) return false;
+  return op === ">" ? a > b : op === "<" ? a < b : op === ">=" ? a >= b : a <= b;
+}
+
+/** The name a column answers to in queries: queryKey, else its id, lowercased. */
+export function columnKey<T>(c: ColumnDef<T>) {
+  return (c.queryKey ?? c.id).toLowerCase();
+}
+
+function findColumn<T>(columns: ColumnDef<T>[], field: string) {
+  return columns.find((c) => columnKey(c) === field || c.header.toLowerCase().replace(/\s+/g, "") === field);
+}
+
+function distance(a: string, b: string) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+/** Field terms that name no column, each with the closest column key (or null). */
+export function unknownFields<T>(terms: QueryTerm[], columns: ColumnDef<T>[]): { term: QueryTerm & { kind: "field" }; suggestion: string | null }[] {
+  return terms
+    .filter((t): t is QueryTerm & { kind: "field" } => t.kind === "field" && !findColumn(columns, t.field))
+    .map((term) => {
+      const best = columns
+        .map((c) => ({ key: columnKey(c), d: distance(term.field, columnKey(c)) }))
+        .sort((a, b) => a.d - b.d)[0];
+      return { term, suggestion: best && best.d <= 2 ? best.key : null };
+    });
+}
+
+/**
+ * True when a row passes every term. Text terms must appear in some searchable column; field
+ * terms test their column. Terms naming unknown columns are ignored (and reported separately).
+ */
+export function matchesQuery<T>(row: T, terms: QueryTerm[], columns: ColumnDef<T>[]): boolean {
+  const searchCols = columns.filter((c) => c.searchable !== false);
+  return terms.every((t) => {
+    let hit: boolean;
+    if (t.kind === "text") hit = searchCols.some((c) => toText(rawValue(row, c)).toLowerCase().includes(t.value));
+    else {
+      const col = findColumn(columns, t.field);
+      if (!col) return true;
+      const raw = col.queryValue ? col.queryValue(row) : rawValue(row, col);
+      hit = compareTerm(raw, t.op, t.value);
+    }
+    return t.negate ? !hit : hit;
+  });
+}
+
+/* ---------- Summaries (pure) ---------- */
+
+export type SummaryKind = "sum" | "avg" | "min" | "max" | "count";
+
+/** Aggregates numbers; null for an empty list (except count). */
+export function summarize(values: number[], kind: SummaryKind): number | null {
+  if (kind === "count") return values.length;
+  if (!values.length) return null;
+  if (kind === "sum") return values.reduce((a, b) => a + b, 0);
+  if (kind === "avg") return values.reduce((a, b) => a + b, 0) / values.length;
+  return kind === "min" ? Math.min(...values) : Math.max(...values);
 }
 
 const alignClass = { left: "text-left", center: "text-center", right: "text-right" } as const;
@@ -227,6 +385,9 @@ export function DataTable<T>({
   caption,
   showCaption = false,
   searchable = true,
+  query: queryProp,
+  defaultQuery = "",
+  onQueryChange,
   filter,
   pageSize: initialPageSize = 10,
   pageSizeOptions = [10, 25, 50],
@@ -245,7 +406,12 @@ export function DataTable<T>({
   const L = { ...DEFAULT_LABELS, ...labelsProp };
   const uid = useId();
 
-  const [query, setQuery] = useState("");
+  const [innerQuery, setInnerQuery] = useState(defaultQuery);
+  const query = queryProp ?? innerQuery;
+  const setQuery = (next: string) => {
+    if (queryProp === undefined) setInnerQuery(next);
+    onQueryChange?.(next);
+  };
   const deferredQuery = useDeferredValue(query);
   const [filterValue, setFilterValue] = useState("");
   const [sort, setSort] = useState<{ id: string; dir: SortDirection } | null>(null);
@@ -263,15 +429,17 @@ export function DataTable<T>({
 
   /* ---------- Pipeline: filter → search → sort → paginate ---------- */
 
-  const filtered = useMemo(() => {
-    const q = deferredQuery.trim().toLowerCase();
-    const searchCols = columns.filter((c) => c.searchable !== false);
-    return data.filter((row) => {
-      if (filter && filterValue && filter.getValue(row) !== filterValue) return false;
-      if (!q) return true;
-      return searchCols.some((c) => toText(rawValue(row, c)).toLowerCase().includes(q));
-    });
-  }, [data, columns, deferredQuery, filter, filterValue]);
+  // The search box takes words and column filters: plan:pro mrr>500 -status:churned.
+  const terms = useMemo(() => parseTableQuery(deferredQuery), [deferredQuery]);
+  const unknown = useMemo(() => unknownFields(terms, columns), [terms, columns]);
+  const filtered = useMemo(
+    () =>
+      data.filter((row) => {
+        if (filter && filterValue && filter.getValue(row) !== filterValue) return false;
+        return matchesQuery(row, terms, columns);
+      }),
+    [data, columns, terms, filter, filterValue],
+  );
 
   const sorted = useMemo(() => {
     if (!sort) return filtered;
@@ -395,6 +563,40 @@ export function DataTable<T>({
   const filterId = `${uid}-filter`;
   const pageSizeId = `${uid}-pagesize`;
   const menuId = `${uid}-columns`;
+
+  const chips = terms
+    .filter((t): t is QueryTerm & { kind: "field" } => t.kind === "field")
+    .map((term) => {
+      const col = findColumn(columns, term.field);
+      return col ? { term, text: L.filterChip(col.header, term.op, term.value, term.negate) } : null;
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
+  const rebuild = (next: string) => {
+    setQuery(next.replace(/\s+/g, " ").trim());
+    setPage(1);
+  };
+  const removeTerm = (raw: string) => {
+    rebuild(query.replace(raw, ""));
+    document.getElementById(searchId)?.focus();
+  };
+  const replaceField = (raw: string, field: string, key: string) => rebuild(query.replace(raw, raw.replace(field, key)));
+
+  // Footer summaries: for the selection while there is one, else for every row that matches.
+  const summaryRows = selectedIds.length > 0 ? selectedRows : sorted;
+  const hasSummary = columns.some((c) => c.summary);
+  const summaryCell = (c: ColumnDef<T>): ReactNode => {
+    if (!c.summary) return null;
+    if (typeof c.summary === "function") return c.summary(summaryRows);
+    const kind = c.summary;
+    const nums = summaryRows
+      .map((r) => (c.sortValue ? c.sortValue(r) : rawValue(r, c)))
+      .map((v) => (typeof v === "number" ? v : toNumber(v)))
+      .filter((v): v is number => v !== null);
+    const value = summarize(nums, kind);
+    if (value === null) return "–";
+    const shown = kind === "count" ? String(value) : (c.summaryFormat ?? NUMBER_FORMAT.format)(value);
+    return kind === "sum" || kind === "count" ? shown : `${kind} ${shown}`;
+  };
 
   // Opaque row backgrounds so sticky cells (which inherit them) hide what scrolls beneath.
   const rowBg = (isSelected: boolean) =>
@@ -525,6 +727,44 @@ export function DataTable<T>({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Column filters from the search box, each removable. */}
+      {chips.length > 0 && (
+        <ul aria-label={L.search} className="-mt-1 flex flex-wrap gap-1.5">
+          {chips.map(({ term, text }) => (
+            <li key={term.raw}>
+              <button
+                type="button"
+                onClick={() => removeTerm(term.raw)}
+                aria-label={L.removeFilter(text)}
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 py-1 pl-2.5 pr-1.5 text-xs font-medium text-indigo-800 outline-none hover:border-indigo-300 hover:bg-indigo-100 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200 dark:hover:bg-indigo-500/20"
+              >
+                <Filter aria-hidden className="size-3" />
+                {text}
+                <X aria-hidden className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {unknown.length > 0 && (
+        <div className="-mt-1 flex flex-col gap-1">
+          {unknown.map(({ term, suggestion }) => (
+            <p key={term.raw} className="flex flex-wrap items-center gap-x-2 text-[13px] text-amber-800 dark:text-amber-300">
+              {L.unknownField(term.field, suggestion)}
+              {suggestion && (
+                <button
+                  type="button"
+                  onClick={() => replaceField(term.raw, term.field, suggestion)}
+                  className="inline-flex min-h-8 items-center rounded-md px-1.5 font-medium text-indigo-700 underline underline-offset-2 outline-none hover:text-indigo-900 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:text-indigo-100"
+                >
+                  {L.applySuggestion(suggestion)}
+                </button>
+              )}
+            </p>
+          ))}
         </div>
       )}
 
@@ -754,6 +994,39 @@ export function DataTable<T>({
                 })
               )}
             </tbody>
+            {hasSummary && !loading && sorted.length > 0 && (
+              <tfoot>
+                <tr className="bg-zinc-50 dark:bg-zinc-950">
+                  {selectable && (
+                    <td className="sticky bottom-0 left-0 z-20 border-t border-zinc-200 bg-inherit px-4 dark:border-zinc-800" style={{ width: CHECK_COL }} />
+                  )}
+                  {visibleColumns.map((c, i) => {
+                    const pinned = c.id === firstColId;
+                    return (
+                      <td
+                        key={c.id}
+                        className={cn(
+                          "sticky bottom-0 z-10 whitespace-nowrap border-t border-zinc-200 bg-inherit px-4 py-2.5 font-semibold text-zinc-900 dark:border-zinc-800 dark:text-zinc-100",
+                          alignClass[c.align ?? "left"],
+                          c.align === "right" && "tabular-nums",
+                          pinned && "z-20",
+                          pinned && pinShadow,
+                        )}
+                        style={{ left: pinned ? stickyLeft : undefined, minWidth: c.minWidth }}
+                      >
+                        {i === 0 && !c.summary ? (
+                          <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
+                            {L.summaryLabel(summaryRows.length, selectedIds.length > 0)}
+                          </span>
+                        ) : (
+                          summaryCell(c)
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
 

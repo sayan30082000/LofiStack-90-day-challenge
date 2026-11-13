@@ -311,7 +311,7 @@ export function PricingCard({
     disabled
       ? "cursor-not-allowed opacity-60 active:scale-100"
       : plan.featured
-        ? "hover:bg-indigo-500 dark:hover:bg-indigo-400"
+        ? "hover:bg-indigo-500 dark:hover:bg-indigo-600"
         : "hover:border-zinc-400 hover:bg-zinc-50 dark:hover:border-zinc-600 dark:hover:bg-zinc-800",
   );
 

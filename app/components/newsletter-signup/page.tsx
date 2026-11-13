@@ -4,10 +4,13 @@ import { BlogFooterDemo, FakeApiDemo, InlineDemo } from "./demos";
 
 export const metadata: Metadata = {
   title: "Newsletter Signup",
-  description: "Email capture with validation on submit then on blur, distinct submitting, success and error states, and an optional consent checkbox.",
+  description:
+    "A newsletter signup that catches mistyped email domains (gmial.com, hotmail.con) before sending, and on success opens the subscriber's own inbox (Gmail, Outlook, Yahoo, iCloud, Proton…) to find the confirmation email.",
 };
 
 const footerCode = `
+// suggestDomains (default: common providers) catches typos like gmial.com and asks before sending.
+// senderEmail lets the success screen's "Open Gmail" button search for your confirmation email.
 <footer className="grid gap-8 @2xl:grid-cols-[1fr_22rem]">
   <BlogLinks />
   <NewsletterSignup
@@ -79,9 +82,9 @@ export default function Page() {
       slug="newsletter-signup"
       examples={[
         {
-          title: "Card variant in a blog footer",
+          title: "Catches typos, then opens the right inbox",
           description:
-            "The card sits beside footer links and stacks under them in narrow containers. The email row itself stacks when the card is narrower than 24rem.",
+            "Type jane@gmial.com or jane@hotmail.con: when you leave the field (or press Subscribe) it asks “Did you mean jane@gmail.com?” with Yes, fix it / No, keep mine, and won't send until you answer. Subscribe with a Gmail, Outlook, Yahoo, iCloud or Proton address and the confirmation has an Open Gmail (etc.) button that goes straight to your inbox, searching for the sender in Gmail.",
           preview: <BlogFooterDemo />,
           code: footerCode,
           minHeight: 420,
@@ -127,6 +130,10 @@ export default function Page() {
         { name: "footnote", type: "ReactNode", description: "Small print under the form. Linked to the field with aria-describedby." },
         { name: "icon", type: "ReactNode", default: "Mail icon", description: "Icon in the card variant's badge." },
         { name: "disabled", type: "boolean", default: "false", description: "Disables the field, checkbox and button." },
+        { name: "suggestDomains", type: "string[] | false", default: "common providers", description: "Domains to check typos against (suggestEmail). Unknown domains still get top-level fixes like .con → .com. false turns it off." },
+        { name: "senderEmail", type: "string", description: "The confirmation email's sender; Gmail's button searches for it." },
+        { name: "showInboxLink", type: "boolean", default: "true", description: "On success, link to the subscriber's webmail when the provider is known (inboxFor)." },
+        { name: "suggestionText / acceptSuggestionText / keepTypedText / openInboxText", type: "text", description: "Wording of the suggestion and the inbox button." },
         { name: "className", type: "string", description: "Classes for the root element." },
       ]}
       accessibility={[
@@ -136,6 +143,8 @@ export default function Page() {
         "Server errors render in a role=\"alert\" box that is also linked to the field. The button stays focusable (aria-disabled) while submitting.",
         "The confirmation renders inside a persistent role=\"status\" region and receives focus; \"Use another email\" returns focus to the field.",
         "The shake on error, the check-mark draw and the fade-in are removed under prefers-reduced-motion.",
+        "The typo suggestion appears in a status region, is linked to the field with aria-describedby, and pressing Subscribe with a likely typo moves focus to “Yes, fix it” instead of sending.",
+        "The inbox button is a real link that says it opens in a new tab.",
       ]}
     />
   );
